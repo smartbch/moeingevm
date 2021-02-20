@@ -20,16 +20,6 @@ extern "C" {
 #endif
 
 /**
- * The Keccak-f[1600] function.
- *
- * The implementation of the Keccak-f function with 1600-bit width of the permutation (b).
- * The size of the state is also 1600 bit what gives 25 64-bit words.
- *
- * @param state  The state of 25 64-bit words on which the permutation is to be performed.
- */
-void ethash_keccakf1600(uint64_t state[25]) NOEXCEPT;
-
-/**
  * The Keccak-f[800] function.
  *
  * The implementation of the Keccak-f function with 800-bit width of the permutation (b).

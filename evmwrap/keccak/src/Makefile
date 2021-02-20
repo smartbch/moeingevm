@@ -1,4 +1,4 @@
-OBJS = keccak.o keccakf1600.o keccakf800.o
+OBJS = keccak.o keccakf800.o
 
 all : ${OBJS}
 
