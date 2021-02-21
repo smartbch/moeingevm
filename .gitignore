@@ -17,3 +17,7 @@
 # vendor/
 
 .idea
+*.dump
+evmwrap/evmtests/evmtests
+*.txt
+*.swp
