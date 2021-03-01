@@ -13,26 +13,7 @@ import (
 	"github.com/moeing-chain/MoeingEVM/types"
 )
 
-/*
-#cgo LDFLAGS: -levmwrap -L.
-#include "../evmwrap/host_bridge/bridge.h"
-
-// In this file, we declare functions in C world and define functions exported by Go world
-
-
-// In Go world we only call this function from C world.
-// Here is only the declaration. Its definition is in bridge.go
-int64_t zero_depth_call_wrap(evmc_bytes32 gas_price,
-                             int64_t gas_limit,
-                             const evmc_address* destination,
-                             const evmc_address* sender,
-                             const evmc_bytes32* value,
-                             const uint8_t* input_data,
-                             size_t input_size,
-		             const struct block_info* block,
-		             int collector_handler,
-		             bool need_gas_estimation);
-*/
+//#include "bridge.h"
 import "C"
 
 type (

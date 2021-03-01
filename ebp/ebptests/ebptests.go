@@ -178,6 +178,8 @@ func runTestCase(filename string, theCase *tc.TestCase, printLog bool) {
 	} else {
 		fmt.Fprintf(os.Stderr, "PASS!! Compare %s %s\n", filename, theCase.Name)
 	}
+
+	os.RemoveAll("./rocksdb.db")
 }
 
 func InitIgnoreFiles() {

@@ -620,7 +620,7 @@ int64_t zero_depth_call(evmc_uint256be gas_price,
 		collect_result_fn(handler, nullptr, &result);
 		return 0;
 	}
-	std::cerr<<"intrinsic_gas: "<<gas_limit<<"-"<<intrinsic;
+	//std::cerr<<"intrinsic_gas: "<<gas_limit<<"-"<<intrinsic<<std::endl;;
 	gas_limit -= intrinsic;
 	//std::cerr<<"="<<gas_limit<<std::endl;
 
