@@ -53,7 +53,7 @@ int64_t zero_depth_call_wrap(evmc_bytes32 gas_price,
 
 enum dl_init_status init_dl() {
 	char* path = getenv("EVMWRAP");
-	if (strlen(path) == 0) {
+	if (path == NULL) {
 		return ENV_NOT_DEFINED;
 	}
 

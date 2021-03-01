@@ -1,7 +1,7 @@
 #include "../evmwrap/host_bridge/bridge.h"
 #include <dlfcn.h>
 #include <stdlib.h>
-#include <string.h>
+
 enum dl_init_status {
 	OK = 0,
 	ENV_NOT_DEFINED = 1,
