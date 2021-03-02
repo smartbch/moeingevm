@@ -418,7 +418,8 @@ func (exec *txEngine) collectCommittableTxs(committableTxList []*TxRunner) {
 			for j, t := range log.Topics {
 				copy(tx.Logs[i].Topics[j][:], t[:])
 			}
-			copy(tx.Logs[i].Data[:], log.Data[:])
+			tx.Logs[i].Data = log.Data
+			log.Data = nil
 			tx.Logs[i].BlockNumber = uint64(exec.currentBlock.Number)
 			copy(tx.Logs[i].BlockHash[:], exec.currentBlock.Hash[:])
 			copy(tx.Logs[i].TxHash[:], tx.Hash[:])
