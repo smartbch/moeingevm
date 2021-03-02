@@ -169,7 +169,7 @@ func (c *Context) GetTxByHash(txHash common.Hash) (tx *Transaction, err error) {
 			tx = tmp
 			return true // stop retry
 		}
-		return true
+		return false
 	})
 	if tx == nil {
 		err = ErrTxNotFound
