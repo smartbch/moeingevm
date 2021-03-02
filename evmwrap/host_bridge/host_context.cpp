@@ -653,7 +653,7 @@ int64_t zero_depth_call(evmc_uint256be gas_price,
 	uint256 balance = ctx.get_balance_as_uint256(*sender);
 	if(balance < u256be_to_u256(*value)) {
 		//std::cerr<<"BAL not enough "<<intx::to_string(balance)<<" "<<intx::to_string(u256be_to_u256(*value))<<std::endl;
-		evmc_result result = {.status_code=EVMC_SUCCESS, .gas_left=msg.gas};
+		evmc_result result = {.status_code=EVMC_FAILURE, .gas_left=msg.gas};
 		txctrl.collect_result(collect_result_fn, handler, &result);
 		vm->destroy(vm);
 		return 0;
