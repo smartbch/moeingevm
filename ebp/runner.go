@@ -9,8 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/holiman/uint256"
 
-	"github.com/moeing-chain/MoeingEVM/utils"
 	"github.com/moeing-chain/MoeingEVM/types"
+	"github.com/moeing-chain/MoeingEVM/utils"
 )
 
 //#include "bridge.h"

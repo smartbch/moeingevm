@@ -14,10 +14,10 @@ import (
 	"github.com/moeing-chain/MoeingADS/store"
 	"github.com/moeing-chain/MoeingADS/store/rabbit"
 
-	"github.com/moeing-chain/MoeingEVM/utils"
 	"github.com/moeing-chain/MoeingEVM/ebp"
 	tc "github.com/moeing-chain/MoeingEVM/evmwrap/testcase"
 	"github.com/moeing-chain/MoeingEVM/types"
+	"github.com/moeing-chain/MoeingEVM/utils"
 )
 
 func WriteWorldStateToRabbit(rbt rabbit.RabbitStore, world *tc.WorldState) {

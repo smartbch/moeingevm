@@ -20,9 +20,9 @@ import (
 	"github.com/moeing-chain/MoeingADS/store/rabbit"
 	"github.com/stretchr/testify/require"
 
-	"github.com/moeing-chain/MoeingEVM/utils"
 	"github.com/moeing-chain/MoeingEVM/evmwrap/testcase"
 	"github.com/moeing-chain/MoeingEVM/types"
+	"github.com/moeing-chain/MoeingEVM/utils"
 )
 
 func prepareTruck() (*store.TrunkStore, *store.RootStore) {

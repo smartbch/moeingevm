@@ -6,6 +6,7 @@ import (
 
 	"github.com/moeing-chain/MoeingEVM/utils"
 )
+
 type AccountInfo struct {
 	data []byte
 }
