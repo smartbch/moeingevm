@@ -253,6 +253,21 @@ func (c *Context) DeductTxFee(sender common.Address, acc *AccountInfo, txGas uin
 	return nil
 }
 
+func (c *Context) BasicQueryLogs(address common.Address, topics []common.Hash, startHeight, endHeight uint32) (logs []Log, err error) {
+	var rawAddress [20]byte = address
+	c.Db.BasicQueryLogs(&rawAddress, FromGethHashes(topics), startHeight, endHeight, func(data []byte) bool {
+		tx := Transaction{}
+		if _, err = tx.UnmarshalMsg(data); err != nil {
+			return false
+		}
+
+		logs = append(logs, tx.Logs...)
+		return true
+	})
+
+	return
+}
+
 func (c *Context) QueryLogs(addresses []common.Address, topics [][]common.Hash, startHeight, endHeight uint32) (logs []Log, err error) {
 	rawAddresses := FromGethAddreses(addresses)
 	rawTopics := make([][][32]byte, len(topics))
