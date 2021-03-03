@@ -164,10 +164,10 @@ func (exec *txEngine) parallelReadAccounts() (infoList []preparedInfo, ctxAA []c
 			txToRun := &types.TxToRun{}
 			txToRun.FromGethTx(tx, sender, exec.cleanCtx.Height)
 			acc := ctxAA[workerId].ctx.GetAccount(sender)
-			infoList[myIdx].valid = (acc != nil)
+			infoList[myIdx].valid = acc != nil
 			if acc == nil {
-				infoList[myIdx].statusStr = "non-existent accout"
-				continue // skip non-existent accout
+				infoList[myIdx].statusStr = "non-existent account"
+				continue // skip non-existent account
 			}
 			ctxAA[workerId].accounts = append(ctxAA[workerId].accounts, sender)
 			ctxAA[workerId].nonces = append(ctxAA[workerId].nonces, acc.Nonce())
