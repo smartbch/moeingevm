@@ -296,3 +296,15 @@ func (c *Context) QueryTxByDst(addr common.Address, startHeight, endHeight uint3
 	})
 	return
 }
+
+func (c *Context) QueryTxByAddr(addr common.Address, startHeight, endHeight uint32) (txs []*Transaction, err error) {
+	c.Db.QueryTxBySrcOrDst(addr, startHeight, endHeight, func(data []byte) bool {
+		tx := Transaction{}
+		if _, err = tx.UnmarshalMsg(data); err != nil {
+			return false
+		}
+		txs = append(txs, &tx)
+		return true
+	})
+	return
+}
