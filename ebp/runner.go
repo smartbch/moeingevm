@@ -32,6 +32,8 @@ type (
 	small_buffer             = C.struct_small_buffer
 )
 
+var PredefinedSystemContractExecutor types.SystemContractExecutor = nil
+
 // This is a global variable. The parameter 'collector_handler' passed to zero_depth_call_wrap is
 // an index to select one TxRunner from this global variable.
 var Runners []*TxRunner
@@ -413,8 +415,17 @@ func runTxHelper(idx int, currBlock *types.BlockInfo, estimateGas bool) int64 {
 	if len(runner.Tx.Data) != 0 {
 		data_ptr = (*C.uint8_t)(unsafe.Pointer(&runner.Tx.Data[0]))
 	}
+	if PredefinedSystemContractExecutor != nil &&
+		PredefinedSystemContractExecutor.IsSystemContract(runner.Tx.To) {
+		status, logs, gasUsed := PredefinedSystemContractExecutor.Execute(runner.Ctx, runner.Tx)
+		runner.Status = status
+		runner.Logs = logs
+		runner.GasUsed = gasUsed
+		return int64(gasUsed);
+	}
+
 	//fmt.Println("run tx")
-	res := C.zero_depth_call_wrap(gas_price,
+	gasEstimated := C.zero_depth_call_wrap(gas_price,
 		C.int64_t(runner.Tx.Gas),
 		&to,
 		&from,
@@ -424,7 +435,7 @@ func runTxHelper(idx int, currBlock *types.BlockInfo, estimateGas bool) int64 {
 		&bi,
 		C.int(idx),
 		C.bool(estimateGas))
-	return int64(res)
+	return int64(gasEstimated)
 }
 
 func StatusIsFailure(status int) bool {
