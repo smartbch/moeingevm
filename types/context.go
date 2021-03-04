@@ -253,6 +253,15 @@ func (c *Context) DeductTxFee(sender common.Address, acc *AccountInfo, txGas uin
 	return nil
 }
 
+func isInTopicSlice(topic [32]byte, topics [][32]byte) bool {
+	for _, t := range topics {
+		if bytes.Equal(t[:], topic[:]) {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *Context) BasicQueryLogs(address common.Address, topics []common.Hash, startHeight, endHeight uint32) (logs []Log, err error) {
 	var rawAddress [20]byte = address
 	rawTopics := FromGethHashes(topics)
@@ -261,8 +270,18 @@ func (c *Context) BasicQueryLogs(address common.Address, topics []common.Hash, s
 		if _, err = tx.UnmarshalMsg(data); err != nil {
 			return false
 		}
-
-		logs = append(logs, tx.Logs...)
+		for _, log := range tx.Logs {
+			hasAll := true
+			for _, t := range topics {
+				if !isInTopicSlice(t, log.Topics) {
+					hasAll = false
+					break
+				}
+			}
+			if hasAll {
+				logs = append(logs, log)
+			}
+		}
 		return true
 	})
 
@@ -295,7 +314,9 @@ func (c *Context) QueryTxBySrc(addr common.Address, startHeight, endHeight uint3
 		if _, err = tx.UnmarshalMsg(data); err != nil {
 			return false
 		}
-		txs = append(txs, &tx)
+		if bytes.Equal(tx.From[:], addr[:]) { // for hash-conflicts corner case
+			txs = append(txs, &tx)
+		}
 		return true
 	})
 	return
@@ -307,7 +328,9 @@ func (c *Context) QueryTxByDst(addr common.Address, startHeight, endHeight uint3
 		if _, err = tx.UnmarshalMsg(data); err != nil {
 			return false
 		}
-		txs = append(txs, &tx)
+		if bytes.Equal(tx.To[:], addr[:]) { // for hash-conflicts corner case
+			txs = append(txs, &tx)
+		}
 		return true
 	})
 	return
@@ -319,7 +342,9 @@ func (c *Context) QueryTxByAddr(addr common.Address, startHeight, endHeight uint
 		if _, err = tx.UnmarshalMsg(data); err != nil {
 			return false
 		}
-		txs = append(txs, &tx)
+		if bytes.Equal(tx.From[:], addr[:]) || bytes.Equal(tx.To[:], addr[:]) { // for hash-conflicts corner case
+			txs = append(txs, &tx)
+		}
 		return true
 	})
 	return
