@@ -417,10 +417,11 @@ func runTxHelper(idx int, currBlock *types.BlockInfo, estimateGas bool) int64 {
 	}
 	if PredefinedSystemContractExecutor != nil &&
 		PredefinedSystemContractExecutor.IsSystemContract(runner.Tx.To) {
-		status, logs, gasUsed := PredefinedSystemContractExecutor.Execute(runner.Ctx, runner.Tx)
+		status, logs, gasUsed, out := PredefinedSystemContractExecutor.Execute(runner.Ctx, currBlock, runner.Tx)
 		runner.Status = status
 		runner.Logs = logs
 		runner.GasUsed = gasUsed
+		runner.OutData = out
 		return int64(gasUsed);
 	}
 
