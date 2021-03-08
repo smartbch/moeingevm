@@ -133,8 +133,7 @@ func runTestCase(filename string, theCase *tc.TestCase, printLog bool) {
 	ctx = ctx.WithRbt(&rbt)
 	txEngine.SetContext(ctx)
 	txEngine.CollectTx(currTx)
-	blk := &types.Block{}
-	txEngine.Prepare(blk)
+	txEngine.Prepare()
 	txEngine.Execute(&currBlock.BlockInfo)
 	trunk.Close(true)
 	txList := txEngine.CommittedTxs()

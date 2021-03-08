@@ -79,7 +79,7 @@ func (exec *txEngine) SetContext(ctx *types.Context) {
 }
 
 // Check transactions' signatures and insert the valid ones into standby queue
-func (exec *txEngine) Prepare(blk *types.Block) {
+func (exec *txEngine) Prepare() {
 	if len(exec.txList) == 0 {
 		exec.cleanCtx.Close(false)
 		return
@@ -246,7 +246,7 @@ func (exec *txEngine) Execute(currBlock *types.BlockInfo) {
 		if txRange.start == txRange.end {
 			break
 		}
-		numTx := exec.executeOneRound(txRange, currBlock)
+		numTx := exec.executeOneRound(txRange, exec.currentBlock)
 		//var tmp = make([]*TxRunner, 0, 4096)
 		for i := 0; i < numTx; i++ {
 			if Runners[i] == nil {
