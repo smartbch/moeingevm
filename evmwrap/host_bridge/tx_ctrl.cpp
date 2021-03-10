@@ -553,10 +553,10 @@ int64_t fill_gas_consumed(std::vector<int64_t>& gas_consumed, const std::vector<
 				return ERROR; // something must be wrong
 			}
 			gas_used_by_sub += consumed;
-			std::cerr<<" gas_used_by_sub "<<gas_used_by_sub<<std::endl;
+			//std::cerr<<" gas_used_by_sub "<<gas_used_by_sub<<std::endl;
 		} else { // g is gas_left
 			int64_t gas_used_by_me = gas_given - gas_used_by_sub - g;
-			std::cerr<<std::dec<<" gas_given "<<gas_given<<" g "<<g<<" gas_used_by_me "<<gas_used_by_me<<std::endl;
+			//std::cerr<<std::dec<<" gas_given "<<gas_given<<" g "<<g<<" gas_used_by_me "<<gas_used_by_me<<std::endl;
 			gas_consumed.push_back(gas_used_by_me);
 			int64_t gas_used = gas_given - g;
 			return gas_used;

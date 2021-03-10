@@ -67,7 +67,9 @@ func (c *Context) WithRbtCopy() *Context {
 }
 
 func (c *Context) Close(dirty bool) {
-	c.Rbt.CloseAndWriteBack(dirty)
+	if c.Rbt != nil {
+		c.Rbt.CloseAndWriteBack(dirty)
+	}
 }
 
 func (c *Context) GetAccount(address common.Address) *AccountInfo {
@@ -149,6 +151,10 @@ func (c *Context) SetCurrValidators(vals []ed25519.PubKey) {
 
 func (c *Context) StoreBlock(blk *modbtypes.Block) {
 	c.Db.AddBlock(blk, -1)
+}
+
+func (c *Context) GetLatestHeight() int64 {
+	return c.Db.GetLatestHeight()
 }
 
 func (c *Context) GetTxByBlkHtAndTxIndex(height uint64, index uint64) *Transaction {
