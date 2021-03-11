@@ -360,6 +360,7 @@ github.com/mitchellh/gox v0.4.0/go.mod h1:Sd9lOJ0+aimLBi73mGofS1ycjY8lL3uZM3JPS4
 github.com/mitchellh/iochan v1.0.0/go.mod h1:JwYml1nuB7xOzsp52dPpHFffvOCDupsG0QubkSMEySY=
 github.com/mitchellh/mapstructure v0.0.0-20160808181253-ca63d7c062ee/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
 github.com/mitchellh/mapstructure v1.1.2/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
+github.com/mmcloughlin/meow v0.0.0-20181112033425-871e50784daf h1:bD6uvpTs5gpzCesUWCGmlEUnU2OINvCQHri8geYwuv0=
 github.com/mmcloughlin/meow v0.0.0-20181112033425-871e50784daf/go.mod h1:uxCZJI8Z1PD2WRnSJtVJGHCyxC5qWhz5lOsx3Bx1NXo=
 github.com/mmcloughlin/meow v0.0.0-20200201185800-3501c7c05d21 h1:2BIiU0QuELctVxpl6FKAsf68ZZvI89I9c8Kt8Guxba8=
 github.com/mmcloughlin/meow v0.0.0-20200201185800-3501c7c05d21/go.mod h1:uxCZJI8Z1PD2WRnSJtVJGHCyxC5qWhz5lOsx3Bx1NXo=
@@ -372,6 +373,8 @@ github.com/moeing-chain/MoeingADS v0.0.0-20210301000353-f63a7437981f h1:B2zCVlnG
 github.com/moeing-chain/MoeingADS v0.0.0-20210301000353-f63a7437981f/go.mod h1:Q3gbAmlW6dcd5xTNEeqslUzPyM2yp5Nslz5sYBy5HLM=
 github.com/moeing-chain/MoeingDB v0.0.0-20210311025129-40b37eabb5ff h1:/wXTrSyN79zhGNR5gSCDfqhaVR06tS5NnLrQ4IuzQFY=
 github.com/moeing-chain/MoeingDB v0.0.0-20210311025129-40b37eabb5ff/go.mod h1:4DST9h/x8bJD79VhFqjuMpsBzIH6IH9mUe7QcHI+CQk=
+github.com/moeing-chain/MoeingDB v0.0.0-20210311081529-c1930cff6d97 h1:ih98ocRnxN0z63N/iB3mPY+1vSafRnaNelngeINn5lQ=
+github.com/moeing-chain/MoeingDB v0.0.0-20210311081529-c1930cff6d97/go.mod h1:4DST9h/x8bJD79VhFqjuMpsBzIH6IH9mUe7QcHI+CQk=
 github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
 github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
 github.com/naoina/go-stringutil v0.1.0/go.mod h1:XJ2SJL9jCtBh+P9q5btrd/Ylo8XwT/h1USek5+NqSA0=
