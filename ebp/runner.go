@@ -422,7 +422,7 @@ func runTxHelper(idx int, currBlock *types.BlockInfo, estimateGas bool) int64 {
 		runner.Logs = logs
 		runner.GasUsed = gasUsed
 		runner.OutData = out
-		return int64(gasUsed);
+		return int64(gasUsed)
 	}
 
 	//fmt.Println("run tx")

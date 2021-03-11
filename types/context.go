@@ -355,3 +355,16 @@ func (c *Context) QueryTxByAddr(addr common.Address, startHeight, endHeight uint
 	})
 	return
 }
+
+func (c *Context) GetTxListByHeight(height uint32) (txs []*Transaction, err error) {
+	txContents := c.Db.GetTxListByHeight(int64(height))
+	txs = make([]*Transaction, len(txContents))
+	for i, txContent := range txContents {
+		txs[i] = &Transaction{}
+		_, err = txs[i].UnmarshalMsg(txContent)
+		if err != nil {
+			break
+		}
+	}
+	return txs, err
+}
