@@ -70,11 +70,15 @@ func getFreeRpcRunnerAndLockIt() int {
 	}
 }
 
-func getRunner(i int) *TxRunner {
+func getRunner(i int) (runner *TxRunner) {
 	if i < RpcRunnersIdStart {
-		return Runners[i]
+		runner = Runners[i]
+		runner.ForRpc = false
+	} else {
+		runner = RpcRunners[i-RpcRunnersIdStart]
+		runner.ForRpc = true
 	}
-	return RpcRunners[i-RpcRunnersIdStart]
+	return
 }
 
 type TxRunner struct {
@@ -85,6 +89,7 @@ type TxRunner struct {
 	Logs    []types.EvmLog
 	Status  int
 	OutData []byte
+	ForRpc  bool
 
 	CreatedContractAddress common.Address
 }
@@ -228,6 +233,9 @@ func (runner *TxRunner) getBlockHash(num C.uint64_t) (result evmc_bytes32) {
 
 // Refund gas fee to the sender according to the real consumed gas
 func (runner *TxRunner) refundGasFee(ret_value *evmc_result, refund C.uint64_t) {
+	if runner.ForRpc {
+		return
+	}
 	gasUsed := runner.Tx.Gas - uint64(ret_value.gas_left)
 	half := (gasUsed + 1) / 2
 	if gasUsed < uint64(refund)+half {
@@ -381,22 +389,24 @@ func runTxHelper(idx int, currBlock *types.BlockInfo, estimateGas bool) int64 {
 		runner.Status = types.IGNORE_TOO_OLD_TX
 		return 0
 	}
-	acc, err := runner.Ctx.CheckNonce(runner.Tx.From, runner.Tx.Nonce)
-	if err != nil {
-		if err == types.ErrAccountNotExist {
-			runner.Status = types.ACCOUNT_NOT_EXIST
-		} else if err == types.ErrNonceTooLarge {
-			runner.Status = types.TX_NONCE_TOO_LARGE
-		} else if err == types.ErrNonceTooSmall {
-			runner.Status = types.TX_NONCE_TOO_SMALL
-		} else {
-			panic("Unknown Error")
+	if !runner.ForRpc {
+		acc, err := runner.Ctx.CheckNonce(runner.Tx.From, runner.Tx.Nonce)
+		if err != nil {
+			if err == types.ErrAccountNotExist {
+				runner.Status = types.ACCOUNT_NOT_EXIST
+			} else if err == types.ErrNonceTooLarge {
+				runner.Status = types.TX_NONCE_TOO_LARGE
+			} else if err == types.ErrNonceTooSmall {
+				runner.Status = types.TX_NONCE_TOO_SMALL
+			} else {
+				panic("Unknown Error")
+			}
+			return 0
 		}
-		return 0
+		// GasFee was deducted in Prepare(), so here we just increase the nonce
+		acc.UpdateNonce(acc.Nonce() + 1)
+		runner.Ctx.SetAccount(runner.Tx.From, acc)
 	}
-	// GasFee was deducted in Prepare(), so here we just increase the nonce
-	acc.UpdateNonce(acc.Nonce() + 1)
-	runner.Ctx.SetAccount(runner.Tx.From, acc)
 	var value, gas_price evmc_bytes32
 	var to, from evmc_address
 	writeCBytes32WithSlice(&value, runner.Tx.Value[:])
