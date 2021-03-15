@@ -13,6 +13,7 @@ import (
 	"github.com/moeing-chain/MoeingEVM/utils"
 )
 
+//#cgo LDFLAGS: -ldl
 //#include "bridge.h"
 import "C"
 
@@ -334,8 +335,8 @@ func collect_result(handler C.int, result *all_changed, ret_value *evmc_result) 
 }
 
 //export get_creation_counter
-func get_creation_counter(handler C.int, n uint8) uint64 {
-	return getRunner(int(handler)).getCreationCounter(n)
+func get_creation_counter(handler C.int, n C.uint8_t) C.uint64_t {
+	return C.uint64_t(getRunner(int(handler)).getCreationCounter(uint8(n)))
 }
 
 //export get_account_info

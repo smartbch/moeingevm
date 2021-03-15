@@ -93,10 +93,10 @@ evmc_host_interface HOST_IFC {
 	.get_code_hash = evmc_get_code_hash,
 	.copy_code = evmc_copy_code,
 	.selfdestruct = evmc_selfdestruct,
-	.call = evmc_call
+	.call = evmc_call,
 	.get_tx_context = evmc_get_tx_context,
 	.get_block_hash = evmc_get_block_hash,
-	.emit_log = evmc_emit_log,
+	.emit_log = evmc_emit_log
 };
 
 
@@ -212,7 +212,7 @@ size_t evmc_host_context::get_code_size(const evmc_address& addr) {
 	if(info.is_null() || info.is_empty()) {
 		return 0;
 	}
-	if(info.sequence == ~0) { // before set_bytecode or EOA
+	if(info.sequence == uint64_t(~0)) { // before set_bytecode or EOA
 		return 0;
 	}
 	return txctrl->get_bytecode_entry(addr).bytecode.size();
@@ -384,7 +384,7 @@ evmc_result evmc_host_context::call() {
 
 evmc_result evmc_host_context::run_precompiled_contract(const evmc_address& addr) {
 	if(addr.bytes[0] == 2) {
-		auto gas = (msg.input_size+31)/32*SHA256_PER_WORD_GAS + SHA256_BASE_GAS;
+		int64_t gas = (msg.input_size+31)/32*SHA256_PER_WORD_GAS + SHA256_BASE_GAS;
 		if(gas > msg.gas) {
 			return evmc_result{.status_code=EVMC_OUT_OF_GAS};
 		}
@@ -398,7 +398,7 @@ evmc_result evmc_host_context::run_precompiled_contract(const evmc_address& addr
 			.output_data=(uint8_t*)&this->smallbuf->data[0],
 			.output_size=SHA256_BLOCK_SIZE};
 	} else if(addr.bytes[0] == 3) {
-		auto gas = (msg.input_size+31)/32*RIPEMD160_PER_WORD_GAS + RIPEMD160_BASE_GAS;
+		int64_t gas = (msg.input_size+31)/32*RIPEMD160_PER_WORD_GAS + RIPEMD160_BASE_GAS;
 		if(gas > msg.gas) {
 			return evmc_result{.status_code=EVMC_OUT_OF_GAS};
 		}
@@ -409,7 +409,7 @@ evmc_result evmc_host_context::run_precompiled_contract(const evmc_address& addr
 			.output_data=(uint8_t*)&this->smallbuf->data[0],
 			.output_size=RIPEMD160_DIGEST_LENGTH};
 	} else if(addr.bytes[0] == 4) {
-		auto gas = (msg.input_size+31)/32*IDENTITY_PER_WORD_GAS + IDENTITY_BASE_GAS;
+		int64_t gas = (msg.input_size+31)/32*IDENTITY_PER_WORD_GAS + IDENTITY_BASE_GAS;
 		if(gas > msg.gas) {
 			return evmc_result{.status_code=EVMC_OUT_OF_GAS};
 		}
@@ -517,7 +517,7 @@ evmc_result evmc_host_context::create_with_contract_addr(const evmc_address& add
 
 	bool max_code_size_exceed = result.output_size > MAX_CODE_SIZE;
 	if(result.status_code == EVMC_SUCCESS && !max_code_size_exceed) {
-		auto create_data_gas = result.output_size * CREATE_DATA_GAS;
+		int64_t create_data_gas = result.output_size * CREATE_DATA_GAS;
 		if(result.gas_left >= create_data_gas) {
 			result.gas_left -= create_data_gas;
 			evmc_bytes32 codehash = keccak256(result.output_data, result.output_size);
@@ -544,15 +544,15 @@ evmc_result evmc_host_context::create_with_contract_addr(const evmc_address& add
 }
 
 bool is_zero_address(const evmc_address addr) {
-	for(int i = 0; i < sizeof(evmc_address); i++) {
+	for(size_t i = 0; i < sizeof(evmc_address); i++) {
 		if(addr.bytes[i] != 0) return false;
 	}
 	return true;
 }
 
 // intrinsic gas is the gas consumed before starting EVM
-uint64_t intrinsic_gas(const uint8_t* input_data, size_t input_size, bool is_contract_creation) {
-	uint64_t gas = TX_GAS;
+int64_t intrinsic_gas(const uint8_t* input_data, size_t input_size, bool is_contract_creation) {
+	int64_t gas = TX_GAS;
 	if(is_contract_creation) {
 		gas = TX_GAS_CONTRACT_CREATION;
 	}
@@ -560,7 +560,7 @@ uint64_t intrinsic_gas(const uint8_t* input_data, size_t input_size, bool is_con
 		return gas;
 	}
 	size_t nz = 0;
-	for(int i = 0; i < input_size; i++) {
+	for(size_t i = 0; i < input_size; i++) {
 		if(input_data[i] != 0) {
 			nz++;
 		}
@@ -607,10 +607,10 @@ int64_t zero_depth_call(evmc_uint256be gas_price,
 		.handler = handler
 	};
 	bool is_contract_creation = is_zero_address(*destination);
-	uint64_t intrinsic = intrinsic_gas(input_data, input_size, is_contract_creation);
+	int64_t intrinsic = intrinsic_gas(input_data, input_size, is_contract_creation);
 	if(is_contract_creation && intrinsic > gas_limit) {
 		// thus we can create zero account (TransactionSendingToZero)
-		uint64_t no_create_gas = intrinsic_gas(input_data, input_size, false);
+		int64_t no_create_gas = intrinsic_gas(input_data, input_size, false);
 		if (no_create_gas <= gas_limit) {
 			intrinsic = no_create_gas;
 			is_contract_creation = false;
