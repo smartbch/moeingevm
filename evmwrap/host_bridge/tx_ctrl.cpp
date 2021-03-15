@@ -160,7 +160,8 @@ void cached_state::set_bytecode(const evmc_address& addr, uint64_t sequence, con
 	} else {
 		*old_dirty = iter->second.dirty;
 	}
-	bytecodes[addr] = bytecode_entry{.bytecode=code, .dirty=true, .deleted=false, .codehash=codehash};
+	bytecodes[addr] = bytecode_entry{.bytecode=code, .codehash=codehash, .deleted=false, .dirty=true};
+
 	accounts[addr].info.sequence = sequence;
 }
 
@@ -539,7 +540,7 @@ const int64_t THRES = 50;
 int64_t fill_gas_consumed(std::vector<int64_t>& gas_consumed, const std::vector<int64_t>& gas_trace, int& offset, int64_t gas_given) {
 	int64_t gas_used_by_sub = 0;
 	while(true) {
-		if(offset >= gas_trace.size()) {
+		if(offset >= int(gas_trace.size())) {
 			return ERROR; // something must be wrong
 		}
 		int64_t g = gas_trace[offset];
@@ -570,7 +571,7 @@ int64_t fill_gas_consumed(std::vector<int64_t>& gas_consumed, const std::vector<
 int64_t get_gas_left(std::vector<int64_t>& gas_consumed, int& offset, int64_t initial_gas, int& curr_depth, int& max_depth) {
 	int64_t gas_left = initial_gas;
 	while(true) {
-		if(offset >= gas_consumed.size()) {
+		if(offset >= int(gas_consumed.size())) {
 			return ERROR; // something must be wrong
 		}
 		int64_t g = gas_consumed[offset];
@@ -610,7 +611,7 @@ int64_t estimate_gas_with_trace(std::vector<int64_t>& gas_trace, int64_t init_gu
 	if(ret == ERROR) {
 		return ERROR; // something must be wrong
 	}
-	if(offset != gas_consumed.size()) {
+	if(offset != int(gas_consumed.size())) {
 		return ERROR; // something must be wrong
 	}
 	//for(int i=0; i<gas_consumed.size(); i++) {

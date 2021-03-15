@@ -93,11 +93,12 @@ evmc_host_interface HOST_IFC {
 	.get_code_hash = evmc_get_code_hash,
 	.copy_code = evmc_copy_code,
 	.selfdestruct = evmc_selfdestruct,
+	.call = evmc_call
 	.get_tx_context = evmc_get_tx_context,
 	.get_block_hash = evmc_get_block_hash,
 	.emit_log = evmc_emit_log,
-	.call = evmc_call
 };
+
 
 evmc_bytes32 ZERO_BYTES32 {
 	.bytes = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
