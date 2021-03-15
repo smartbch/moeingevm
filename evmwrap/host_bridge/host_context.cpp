@@ -81,7 +81,7 @@ void evmc_emit_log(struct evmc_host_context* context,
 
 struct evmc_result evmc_call(struct evmc_host_context* context,
                              const struct evmc_message* msg) {
-	return context->call(msg);
+	return context->call(*msg);
 }
 
 evmc_host_interface HOST_IFC {
@@ -288,15 +288,15 @@ void evmc_host_context::load_code(const evmc_address& addr) {
 	this->code = &txctrl->get_bytecode_entry(addr).bytecode;
 }
 
-evmc_result evmc_host_context::call(const evmc_message* call_msg) {
+evmc_result evmc_host_context::call(const evmc_message& call_msg) {
 	//std::cerr<<"NOW call with gas "<<call_msg->gas<<std::endl;
-	txctrl->gas_trace_append(call_msg->gas|MSB64);
-	evmc_host_context ctx(txctrl, *call_msg, this->smallbuf);
+	txctrl->gas_trace_append(call_msg.gas|MSB64);
+	evmc_host_context ctx(txctrl, call_msg, this->smallbuf);
 	evmc_result result;
 	bool normal_run = false;
-	switch (call_msg->kind) {
+	switch (call_msg.kind) {
 	case EVMC_CALL:
-		if((call_msg->flags & EVMC_STATIC) != 0) {
+		if((call_msg.flags & EVMC_STATIC) != 0) {
 			normal_run = true;
 		} else {
 			result = ctx.call();
@@ -305,7 +305,7 @@ evmc_result evmc_host_context::call(const evmc_message* call_msg) {
 	case EVMC_CALLCODE:
 	case EVMC_DELEGATECALL:
 		ctx.msg.destination = msg.destination;
-		//std::cerr<<"CALLCODE/DELEGATECALL src "<<to_hex(call_msg->sender)<<" dst "<<to_hex(call_msg->destination)<<" self "<<to_hex(ctx.msg.destination)<<std::endl;
+		//std::cerr<<"CALLCODE/DELEGATECALL src "<<to_hex(call_msg.sender)<<" dst "<<to_hex(call_msg.destination)<<" self "<<to_hex(ctx.msg.destination)<<std::endl;
 		normal_run = true;
 		break;
 	case EVMC_CREATE:
@@ -318,11 +318,11 @@ evmc_result evmc_host_context::call(const evmc_message* call_msg) {
 		assert(false);
 	}
 	if(normal_run) {
-		if(is_precompiled(call_msg->destination)) {
-			result = ctx.run_precompiled_contract(call_msg->destination);
+		if(is_precompiled(call_msg.destination)) {
+			result = ctx.run_precompiled_contract(call_msg.destination);
 		} else {
-			ctx.load_code(call_msg->destination);
-			if(call_msg->kind == EVMC_CALL) {
+			ctx.load_code(call_msg.destination);
+			if(call_msg.kind == EVMC_CALL) {
 				ctx.check_eip158();
 			}
 			result = ctx.run_vm(txctrl->snapshot());
@@ -658,7 +658,7 @@ int64_t zero_depth_call(evmc_uint256be gas_price,
 		vm->destroy(vm);
 		return 0;
 	}
-	evmc_result result = ctx.call(&msg);
+	evmc_result result = ctx.call(msg);
 	//std::cerr<<"result.status_code "<<result.status_code<<std::endl;
 	txctrl.collect_result(collect_result_fn, handler, &result);
 	int64_t gas_estimated = 0;

@@ -88,7 +88,7 @@ public:
 
 	void load_code(const evmc_address& addr);
 	evmc_result run_precompiled_contract(const evmc_address& addr);
-	evmc_result call(const evmc_message* msg);
+	evmc_result call(const evmc_message& msg);
 	evmc_result call();
 	evmc_result run_vm(size_t snapshot);
 	evmc_result create();
