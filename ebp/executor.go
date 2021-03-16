@@ -3,7 +3,7 @@ package ebp
 import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/smartbch/MoeingEVM/types"
+	"github.com/smartbch/moeingevm/types"
 )
 
 type TxExecutor interface {

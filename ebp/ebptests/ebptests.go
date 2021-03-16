@@ -10,14 +10,14 @@ import (
 	"strings"
 
 	"github.com/holiman/uint256"
-	moeingads "github.com/smartbch/MoeingADS"
-	"github.com/smartbch/MoeingADS/store"
-	"github.com/smartbch/MoeingADS/store/rabbit"
+	"github.com/smartbch/moeingads"
+	"github.com/smartbch/moeingads/store"
+	"github.com/smartbch/moeingads/store/rabbit"
 
-	"github.com/smartbch/MoeingEVM/ebp"
-	tc "github.com/smartbch/MoeingEVM/evmwrap/testcase"
-	"github.com/smartbch/MoeingEVM/types"
-	"github.com/smartbch/MoeingEVM/utils"
+	"github.com/smartbch/moeingevm/ebp"
+	tc "github.com/smartbch/moeingevm/evmwrap/testcase"
+	"github.com/smartbch/moeingevm/types"
+	"github.com/smartbch/moeingevm/utils"
 )
 
 func WriteWorldStateToRabbit(rbt rabbit.RabbitStore, world *tc.WorldState) {

@@ -9,8 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/holiman/uint256"
 
-	"github.com/smartbch/MoeingEVM/types"
-	"github.com/smartbch/MoeingEVM/utils"
+	"github.com/smartbch/moeingevm/types"
+	"github.com/smartbch/moeingevm/utils"
 )
 
 //#cgo LDFLAGS: -ldl

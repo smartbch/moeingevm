@@ -8,10 +8,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/holiman/uint256"
-	"github.com/smartbch/MoeingADS/store/rabbit"
+	"github.com/smartbch/moeingads/store/rabbit"
 
-	"github.com/smartbch/MoeingEVM/types"
-	"github.com/smartbch/MoeingEVM/utils"
+	"github.com/smartbch/moeingevm/types"
+	"github.com/smartbch/moeingevm/utils"
 )
 
 var _ TxExecutor = (*txEngine)(nil)
