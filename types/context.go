@@ -12,8 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/moeing-chain/MoeingADS/store/rabbit"
-	modbtypes "github.com/moeing-chain/MoeingDB/types"
+	"github.com/smartbch/MoeingADS/store/rabbit"
+	modbtypes "github.com/smartbch/MoeingDB/types"
 )
 
 var (

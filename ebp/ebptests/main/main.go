@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/moeing-chain/MoeingEVM/ebp/ebptests"
+	"github.com/smartbch/MoeingEVM/ebp/ebptests"
 )
 
 func main() {

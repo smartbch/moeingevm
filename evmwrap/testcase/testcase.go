@@ -19,8 +19,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/holiman/uint256"
 
-	"github.com/moeing-chain/MoeingEVM/types"
-	"github.com/moeing-chain/MoeingEVM/utils"
+	"github.com/smartbch/MoeingEVM/types"
+	"github.com/smartbch/MoeingEVM/utils"
 )
 
 /*
