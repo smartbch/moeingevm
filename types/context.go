@@ -17,9 +17,9 @@ import (
 )
 
 var (
-	ErrAccountNotExist error = errors.New("account does not exist")
-	ErrNonceTooSmall   error = errors.New("tx nonce is smaller than the account nonce")
-	ErrNonceTooLarge   error = errors.New("tx nonce is smaller than the account nonce")
+	ErrAccountNotExist = errors.New("account does not exist")
+	ErrNonceTooSmall   = errors.New("tx nonce is smaller than the account nonce")
+	ErrNonceTooLarge   = errors.New("tx nonce is larger than the account nonce")
 )
 
 type Context struct {
