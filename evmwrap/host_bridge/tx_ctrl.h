@@ -144,7 +144,8 @@ struct world_state_reader {
 	}
 	account_info get_account(const evmc_address& addr) {
 		evmc_bytes32 balance;
-		account_info info = {.selfdestructed=false};
+		account_info info;
+		info.selfdestructed = false;
 		get_account_info_fn(handler, (evmc_address*)(&addr)/*drop const*/, &balance, &info.nonce, &info.sequence);
 		info.balance = u256be_to_u256(balance);
 		return info;
