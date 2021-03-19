@@ -130,7 +130,8 @@ const bytecode_entry& cached_state::get_bytecode_entry(const evmc_address& addr)
 	if(iter != bytecodes.end()) {
 		return iter->second;
 	}
-	bytecode_entry e = {.dirty=false};
+	bytecode_entry e;
+	e.dirty = false;
 	e.bytecode = world->get_bytecode(addr, &e.codehash);
 	if(e.bytecode.size() == 0) {
 		e.codehash = HASH_FOR_ZEROCODE;
