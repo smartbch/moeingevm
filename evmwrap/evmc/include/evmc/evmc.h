@@ -295,6 +295,26 @@ enum evmc_status_code
      */
     EVMC_WASM_TRAP = 16,
 
+    /**
+     * A call to precompiled contract failed
+     */
+    EVMC_PRECOMPILED_FAILED = 17,
+
+    /**
+     * Recreate a already-exist contract
+     */
+    EVMC_RECREATE_CONTRACT = 18, 
+
+    /**
+     * Exceed the maximum size for contract bytecode
+     */
+    EVMC_EXCEED_MAX_CODE_SIZE = 19,
+
+    /**
+     * Balance is not enough to pay transaction's value
+     */
+    EVMC_BALANCE_NOT_ENOUGH = 20,
+
     /** EVM implementation generic internal error. */
     EVMC_INTERNAL_ERROR = -1,
 

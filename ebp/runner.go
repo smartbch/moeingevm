@@ -390,23 +390,22 @@ func runTxHelper(idx int, currBlock *types.BlockInfo, estimateGas bool) int64 {
 		runner.Status = types.IGNORE_TOO_OLD_TX
 		return 0
 	}
-	if !runner.ForRpc {
-		acc, err := runner.Ctx.CheckNonce(runner.Tx.From, runner.Tx.Nonce)
-		if err != nil {
-			if err == types.ErrAccountNotExist {
-				runner.Status = types.ACCOUNT_NOT_EXIST
-			} else if err == types.ErrNonceTooLarge {
-				runner.Status = types.TX_NONCE_TOO_LARGE
-			} else if err == types.ErrNonceTooSmall {
-				runner.Status = types.TX_NONCE_TOO_SMALL
-			} else {
-				panic("Unknown Error")
-			}
-			return 0
-		}
+	acc, err := runner.Ctx.CheckNonce(runner.Tx.From, runner.Tx.Nonce)
+	if err == nil {
 		// GasFee was deducted in Prepare(), so here we just increase the nonce
 		acc.UpdateNonce(acc.Nonce() + 1)
 		runner.Ctx.SetAccount(runner.Tx.From, acc)
+	} else if !runner.ForRpc {
+		if err == types.ErrAccountNotExist {
+			runner.Status = types.ACCOUNT_NOT_EXIST
+		} else if err == types.ErrNonceTooLarge {
+			runner.Status = types.TX_NONCE_TOO_LARGE
+		} else if err == types.ErrNonceTooSmall {
+			runner.Status = types.TX_NONCE_TOO_SMALL
+		} else {
+			panic("Unknown Error")
+		}
+		return 0
 	}
 	var value, gas_price evmc_bytes32
 	var to, from evmc_address
@@ -486,6 +485,14 @@ func StatusToStr(status int) string {
 		return "contract-validation-failure"
 	case int(C.EVMC_ARGUMENT_OUT_OF_RANGE):
 		return "argument-out-of-range"
+	case int(C.EVMC_PRECOMPILED_FAILED):
+		return "precompiled-contract-failed"
+	case int(C.EVMC_RECREATE_CONTRACT):
+		return "recreate-existing-contract"
+	case int(C.EVMC_EXCEED_MAX_CODE_SIZE):
+		return "exceed-max-code-size"
+	case int(C.EVMC_BALANCE_NOT_ENOUGH):
+		return "balance-not-enough"
 	case types.IGNORE_TOO_OLD_TX:
 		return "too-old-and-ignored"
 	case types.ACCOUNT_NOT_EXIST:

@@ -435,7 +435,7 @@ evmc_result evmc_host_context::run_precompiled_contract(const evmc_address& addr
 		return evmc_result{.status_code=EVMC_OUT_OF_GAS};
 	}
 	if(ret_value != 1) {
-		return evmc_result{.status_code=EVMC_FAILURE};
+		return evmc_result{.status_code=EVMC_PRECOMPILED_FAILED};
 	}
 	return evmc_result{
 		.status_code=EVMC_SUCCESS,
@@ -495,7 +495,7 @@ evmc_result evmc_host_context::create_with_contract_addr(const evmc_address& add
 		txctrl->incr_nonce(msg.sender);
 	}
 	if(!create_pre_check(addr)) {
-		return evmc_result{.status_code = EVMC_FAILURE, .gas_left = 0};
+		return evmc_result{.status_code = EVMC_RECREATE_CONTRACT, .gas_left = 0};
 	}
 	msg.destination = addr;
 	bytes input_as_code(msg.input_data, msg.input_size);
@@ -537,7 +537,7 @@ evmc_result evmc_host_context::create_with_contract_addr(const evmc_address& add
 		}
 	}
 	if(result.status_code == EVMC_SUCCESS && max_code_size_exceed) {
-		result.status_code = EVMC_FAILURE;
+		result.status_code = EVMC_EXCEED_MAX_CODE_SIZE;
 	}
 	result.create_address = addr;
 	return result;
@@ -654,7 +654,7 @@ int64_t zero_depth_call(evmc_uint256be gas_price,
 	uint256 balance = ctx.get_balance_as_uint256(*sender);
 	if(balance < u256be_to_u256(*value)) {
 		//std::cerr<<"BAL not enough "<<intx::to_string(balance)<<" "<<intx::to_string(u256be_to_u256(*value))<<std::endl;
-		evmc_result result = {.status_code=EVMC_FAILURE, .gas_left=msg.gas};
+		evmc_result result = {.status_code=EVMC_BALANCE_NOT_ENOUGH, .gas_left=msg.gas};
 		txctrl.collect_result(collect_result_fn, handler, &result);
 		vm->destroy(vm);
 		return 0;
