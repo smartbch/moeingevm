@@ -77,10 +77,10 @@ extern evmc_bytes32 HASH_FOR_ZEROCODE; // keccak hash of a zero-length string
 
 // basic information about an account, NOT including its bytecode
 struct account_info {
+	bool selfdestructed;
 	uint256 balance;
 	uint64_t nonce; // If not exists, nonce is uint64_t(-1)
 	uint64_t sequence; // For EOA, sequence is uint64_t(-1)
-	bool selfdestructed;
 	bool is_null() const {return nonce==uint64_t(-1);}
 	bool is_eoa() const {return sequence==uint64_t(-1);}
 	bool is_empty() const {return nonce==0 && balance==uint256(0) && is_eoa();}
@@ -100,10 +100,10 @@ struct creation_counter_entry {
 
 // a cache entry for smart contracts' bytecode
 struct bytecode_entry {
-	bytes bytecode;
-	evmc_bytes32 codehash;
 	bool deleted;
 	bool dirty;
+	bytes bytecode;
+	evmc_bytes32 codehash;
 };
 
 struct evm_log {

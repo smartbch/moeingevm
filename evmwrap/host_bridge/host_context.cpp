@@ -617,7 +617,7 @@ int64_t zero_depth_call(evmc_uint256be gas_price,
 		}
 	}
 	if(intrinsic > gas_limit) {
-		evmc_result result = {.status_code=EVMC_OUT_OF_GAS, .gas_left=0};
+		evmc_result result {.status_code=EVMC_OUT_OF_GAS, .gas_left=0};
 		collect_result_fn(handler, nullptr, &result);
 		return 0;
 	}
@@ -654,7 +654,7 @@ int64_t zero_depth_call(evmc_uint256be gas_price,
 	uint256 balance = ctx.get_balance_as_uint256(*sender);
 	if(balance < u256be_to_u256(*value)) {
 		//std::cerr<<"BAL not enough "<<intx::to_string(balance)<<" "<<intx::to_string(u256be_to_u256(*value))<<std::endl;
-		evmc_result result = {.status_code=EVMC_BALANCE_NOT_ENOUGH, .gas_left=msg.gas};
+		evmc_result result {.status_code=EVMC_BALANCE_NOT_ENOUGH, .gas_left=msg.gas};
 		txctrl.collect_result(collect_result_fn, handler, &result);
 		vm->destroy(vm);
 		return 0;

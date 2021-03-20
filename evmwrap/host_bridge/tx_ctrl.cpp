@@ -13,7 +13,7 @@ const account_info& cached_state::get_account(const evmc_address& addr) {
 	if(iter != accounts.end()) {
 		return iter->second.info;
 	}
-	account_entry entry = {};
+	account_entry entry {};
 	entry.info = world->get_account(addr);
 	entry.info.selfdestructed = false;
 	entry.dirty = false;
@@ -23,7 +23,7 @@ const account_info& cached_state::get_account(const evmc_address& addr) {
 
 // create a new account and insert it into cache
 void cached_state::new_account(const evmc_address& addr) {
-	account_entry entry = {};
+	account_entry entry {};
 	entry.info.balance = uint256(0);
 	entry.info.nonce = 0;
 	entry.info.sequence = ~0;
@@ -130,7 +130,7 @@ const bytecode_entry& cached_state::get_bytecode_entry(const evmc_address& addr)
 	if(iter != bytecodes.end()) {
 		return iter->second;
 	}
-	bytecode_entry e = {.dirty=false};
+	bytecode_entry e {.deleted=false, .dirty=false};
 	e.bytecode = world->get_bytecode(addr, &e.codehash);
 	if(e.bytecode.size() == 0) {
 		e.codehash = HASH_FOR_ZEROCODE;
@@ -296,7 +296,7 @@ std::vector<added_log> cached_state::collect_logs() {
 	result.reserve(logs.size());
 	for(size_t i = 0; i < logs.size(); i++) {
 		evm_log& elem = logs[i];
-		added_log log = {
+		added_log log {
 			.contract_addr = &elem.contract_addr,
 			.data = (char*)elem.data.data(),
 			.size = int(elem.data.size()),
@@ -322,7 +322,7 @@ void cached_state::collect_result(bridge_collect_result_fn collect_result_fn,
 	std::vector<changed_bytecode> changed_bytecodes = collect_bytecodes();
 	std::vector<changed_value> changed_values = collect_values();
 	std::vector<added_log> added_logs = collect_logs();
-	all_changed changes = {
+	all_changed changes {
 		.accounts = changed_accounts.data(),
 		.account_num = changed_accounts.size(),
 		.creation_counters = changed_creation_counters.data(),
@@ -390,7 +390,7 @@ void journal_entry::revert(cached_state* state) {
 // these operations may be reverted later.
 
 void tx_control::transfer(const evmc_address& sender, const evmc_address& receiver, const uint256& amount) {
-	journal_entry e = {.type=BALANCE_CHG};
+	journal_entry e {.type=BALANCE_CHG};
 	e.prev_value = u256_to_bytes(amount);
 	e.balance_change.sender = sender;
 	e.balance_change.receiver = receiver;
@@ -401,7 +401,7 @@ void tx_control::transfer(const evmc_address& sender, const evmc_address& receiv
 }
 
 void tx_control::burn(const evmc_address& sender, const uint256& amount) {
-	journal_entry e = {.type=BALANCE_CHG};
+	journal_entry e {.type=BALANCE_CHG};
 	e.prev_value = u256_to_bytes(amount);
 	e.balance_change.sender = sender;
 	e.balance_change.is_burn = true;
@@ -410,14 +410,14 @@ void tx_control::burn(const evmc_address& sender, const uint256& amount) {
 }
 
 void tx_control::new_account(const evmc_address& addr) {
-	journal_entry e = {.type=ACCOUNT_CREATE};
+	journal_entry e {.type=ACCOUNT_CREATE};
 	e.account_creation.addr = addr;
 	cstate.new_account(addr);
 	journal.push_back(e);
 }
 
 void tx_control::incr_nonce(const evmc_address& addr) {
-	journal_entry e = {.type=NONCE_INCR};
+	journal_entry e {.type=NONCE_INCR};
 	e.nonce_incr.addr = addr;
 	cstate.incr_nonce(addr, &e.nonce_incr.old_dirty);
 	journal.push_back(e);
@@ -425,7 +425,7 @@ void tx_control::incr_nonce(const evmc_address& addr) {
 
 void tx_control::set_bytecode(const evmc_address& addr, const bytes& code, const evmc_bytes32& codehash) {
 	// when we create a contract account with 'set_bytecode', we must assign a new sequence to it
-	journal_entry e = {.type=CREATION_COUNTER_INCR};
+	journal_entry e {.type=CREATION_COUNTER_INCR};
 	e.creation_counter_incr.lsb = addr.bytes[0];
 	uint64_t counter = cstate.incr_creation_counter(addr.bytes[0], &e.creation_counter_incr.old_dirty);
 	journal.push_back(e);
@@ -444,7 +444,7 @@ void tx_control::selfdestruct(const evmc_address& addr) {
 	}
 	// for selfdestructed, the account and the bytecode must be deleted seperately, because
 	// they are stored seperately.
-	journal_entry e = {.type=SELFDESTRUCT_CHG};
+	journal_entry e {.type=SELFDESTRUCT_CHG};
 	e.selfdestruct_change.addr = addr;
 	e.selfdestruct_change.prev_state = cstate.set_selfdestructed(addr, true, &e.selfdestruct_change.old_dirty);
 	journal.push_back(e);
@@ -458,7 +458,7 @@ void tx_control::selfdestruct(const evmc_address& addr) {
 // for SSTORE's gas&refund calculation, we must return correct evmc_storage_status according to EIP-2200
 evmc_storage_status tx_control::set_value(const evmc_address& addr, const evmc_bytes32& key, bytes_info raw_value) {
 	const account_info& info = cstate.get_account(addr);
-	journal_entry e = {.type=VALUE_CHG};
+	journal_entry e {.type=VALUE_CHG};
 	e.value_change.key = key;
 	e.value_change.sequence = info.sequence;
 	const bytes& new_value = cstate.set_value(info.sequence, key, raw_value, &e.prev_value);
@@ -515,14 +515,14 @@ evmc_storage_status tx_control::set_value(const evmc_address& addr, const evmc_b
 }
 
 void tx_control::add_refund(uint64_t delta) {
-	journal_entry e = {.type=REFUND_CHG};
+	journal_entry e {.type=REFUND_CHG};
 	e.refund_change.old_refund = cstate.refund;
 	cstate.refund += delta;
 	journal.push_back(e);
 }
 
 void tx_control::sub_refund(uint64_t delta) {
-	journal_entry e = {.type=REFUND_CHG};
+	journal_entry e {.type=REFUND_CHG};
 	e.refund_change.old_refund = cstate.refund;
 	cstate.refund -= delta;
 	journal.push_back(e);
