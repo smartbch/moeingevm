@@ -232,9 +232,9 @@ func (c *Context) CheckNonce(sender common.Address, nonce uint64) (*AccountInfo,
 	n := acc.Nonce()
 	//fmt.Printf("acc:%s, acc nonce:%d, tx nonce:%d\n", sender, n, nonce)
 	if nonce < n {
-		return nil, ErrNonceTooSmall
+		return acc, ErrNonceTooSmall
 	} else if nonce > n {
-		return nil, ErrNonceTooLarge
+		return acc, ErrNonceTooLarge
 	}
 	return acc, nil
 }

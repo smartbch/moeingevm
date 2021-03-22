@@ -391,11 +391,7 @@ func runTxHelper(idx int, currBlock *types.BlockInfo, estimateGas bool) int64 {
 		return 0
 	}
 	acc, err := runner.Ctx.CheckNonce(runner.Tx.From, runner.Tx.Nonce)
-	if err == nil {
-		// GasFee was deducted in Prepare(), so here we just increase the nonce
-		acc.UpdateNonce(acc.Nonce() + 1)
-		runner.Ctx.SetAccount(runner.Tx.From, acc)
-	} else if !runner.ForRpc {
+	if err != nil && !runner.ForRpc {
 		if err == types.ErrAccountNotExist {
 			runner.Status = types.ACCOUNT_NOT_EXIST
 		} else if err == types.ErrNonceTooLarge {
@@ -406,6 +402,11 @@ func runTxHelper(idx int, currBlock *types.BlockInfo, estimateGas bool) int64 {
 			panic("Unknown Error")
 		}
 		return 0
+	}
+	if acc != nil {
+		// GasFee was deducted in Prepare(), so here we just increase the nonce
+		acc.UpdateNonce(acc.Nonce() + 1)
+		runner.Ctx.SetAccount(runner.Tx.From, acc)
 	}
 	var value, gas_price evmc_bytes32
 	var to, from evmc_address
