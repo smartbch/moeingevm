@@ -160,7 +160,7 @@ void cached_state::set_bytecode(const evmc_address& addr, uint64_t sequence, con
 	} else {
 		*old_dirty = iter->second.dirty;
 	}
-	bytecodes[addr] = bytecode_entry{.bytecode=code, .codehash=codehash, .deleted=false, .dirty=true};
+	bytecodes[addr] = bytecode_entry{.deleted=false, .dirty=true, .bytecode=code, .codehash=codehash};
 
 	accounts[addr].info.sequence = sequence;
 }
