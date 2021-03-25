@@ -62,8 +62,8 @@ func (sl *spinLock) TryLock() bool {
 
 func getFreeRpcRunnerAndLockIt() int {
 	for {
-		for i, lock := range RpcRunnerLocks {
-			if lock.TryLock() {
+		for i := range RpcRunnerLocks {
+			if RpcRunnerLocks[i].TryLock() {
 				return i
 			}
 		}
@@ -367,8 +367,8 @@ func RunTxForRpc(currBlock *types.BlockInfo, estimateGas bool, runner *TxRunner)
 	idx := getFreeRpcRunnerAndLockIt()
 	RpcRunners[idx] = runner
 	defer func() {
-		RpcRunnerLocks[idx].Unlock()
 		RpcRunners[idx] = nil
+		RpcRunnerLocks[idx].Unlock()
 	}()
 	return runTxHelper(idx+RpcRunnersIdStart, currBlock, estimateGas)
 }
