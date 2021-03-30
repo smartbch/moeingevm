@@ -2,6 +2,7 @@ package ebp
 
 import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/holiman/uint256"
 
 	"github.com/smartbch/moeingevm/types"
 )
@@ -17,6 +18,9 @@ type TxExecutor interface {
 	//set context
 	SetContext(ctx *types.Context)
 	Context() *types.Context
+
+	//collect infos, not thread safe
 	CollectTxsCount() int
 	CommittedTxs() []*types.Transaction
+	GasUsedInfo() (gasUsed uint64, gasFee uint256.Int)
 }

@@ -2,6 +2,7 @@ package ebp
 
 import (
 	"encoding/binary"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -39,6 +40,7 @@ type txEngine struct {
 	currentBlock *types.BlockInfo
 
 	cumulativeGasUsed uint64
+	cumulativeGasFee  *uint256.Int
 }
 
 func (exec *txEngine) Context() *types.Context {
@@ -385,9 +387,14 @@ func (exec *txEngine) checkTxDepsAndUptStandbyQ(txRange *TxRange, standbyTxList 
 // Fill 'exec.committedTxs' with 'committableTxList'
 func (exec *txEngine) collectCommittableTxs(committableTxList []*TxRunner) {
 	exec.cumulativeGasUsed = 0
+	exec.cumulativeGasFee = uint256.NewInt().SetUint64(0)
 	var logIndex uint
 	for idx, runner := range committableTxList {
+		fmt.Printf("gasUsed in tx: %d, gasPrice in tx: %d\n", runner.GasUsed, uint256.NewInt().SetBytes(runner.Tx.GasPrice[:]).Uint64())
 		exec.cumulativeGasUsed += runner.GasUsed
+		exec.cumulativeGasFee.Add(exec.cumulativeGasFee,
+			uint256.NewInt().Mul(uint256.NewInt().SetUint64(runner.GasUsed),
+				uint256.NewInt().SetBytes(runner.Tx.GasPrice[:])))
 		tx := &types.Transaction{
 			Hash:              runner.Tx.HashID,
 			TransactionIndex:  int64(idx),
@@ -455,6 +462,13 @@ func (exec *txEngine) CollectTx(tx *gethtypes.Transaction) {
 
 func (exec *txEngine) CollectTxsCount() int {
 	return len(exec.txList)
+}
+
+func (exec *txEngine) GasUsedInfo() (gasUsed uint64, gasFee uint256.Int) {
+	if exec.cumulativeGasFee == nil {
+		return exec.cumulativeGasUsed, uint256.Int{}
+	}
+	return exec.cumulativeGasUsed, *exec.cumulativeGasFee
 }
 
 func parallelRun(workerCount int, fn func(workerID int)) {
