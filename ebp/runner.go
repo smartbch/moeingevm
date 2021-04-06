@@ -86,6 +86,7 @@ type TxRunner struct {
 	id      int64
 	Ctx     types.Context
 	GasUsed uint64
+	GasRefund uint256.Int
 	Tx      *types.TxToRun
 	Logs    []types.EvmLog
 	Status  int
@@ -250,13 +251,12 @@ func (runner *TxRunner) refundGasFee(ret_value *evmc_result, refund C.uint64_t) 
 	var returnedGasFee uint256.Int
 	gasPrice := utils.U256FromSlice32(runner.Tx.GasPrice[:])
 	returnedGasFee.Mul(uint256.NewInt().SetUint64(runner.Tx.Gas-gasUsed), gasPrice)
-
 	acc := types.NewAccountInfo(runner.Ctx.Rbt.Get(k))
 	x := utils.U256FromSlice32(acc.BalanceSlice())
 	x.Add(x, &returnedGasFee)
 	copy(acc.BalanceSlice(), utils.U256ToSlice32(x))
 	runner.Ctx.Rbt.Set(k, acc.Bytes())
-
+	runner.GasRefund = returnedGasFee
 	runner.GasUsed = gasUsed
 }
 
