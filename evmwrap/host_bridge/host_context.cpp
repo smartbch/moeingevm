@@ -5,13 +5,18 @@
 extern "C" {
 #include "../sha256/sha256.h"
 #include "../ripemd160/ripemd160.h"
+#include "./../evmc/include/evmc/helpers.h"
 }
 
 bool is_precompiled(const evmc_address& addr) {
-	for(int i=0; i<19; i++) {
+	for(int i=0; i<18; i++) {
 		if(addr.bytes[i] != 0) return false;
 	}
-	return 1<=addr.bytes[19] && addr.bytes[19]<=9;
+	if(addr.bytes[18] == SEP_CONTRACT_ADDR_BYTE_18) {
+		return addr.bytes[19] == SEP101_CONTRACT_ADDR_BYTE_19 ||
+		       addr.bytes[19] == SEP206_CONTRACT_ADDR_BYTE_19;
+	}
+	return addr.bytes[18]==0 && 1<=addr.bytes[19] && addr.bytes[19]<=9;
 }
 
 // following functions wrap C++ member functions into C-style functions, thus
@@ -383,41 +388,14 @@ evmc_result evmc_host_context::call() {
 }
 
 evmc_result evmc_host_context::run_precompiled_contract(const evmc_address& addr) {
-	if(addr.bytes[0] == 2) {
-		int64_t gas = (msg.input_size+31)/32*SHA256_PER_WORD_GAS + SHA256_BASE_GAS;
-		if(gas > msg.gas) {
-			return evmc_result{.status_code=EVMC_OUT_OF_GAS};
-		}
-		SHA256_CTX ctx;
-		sha256_init(&ctx);
-		sha256_update(&ctx, msg.input_data, msg.input_size);
-		sha256_final(&ctx, (uint8_t*)&this->smallbuf->data[0]);
-		return evmc_result{
-			.status_code=EVMC_SUCCESS,
-			.gas_left=int64_t(msg.gas-gas),
-			.output_data=(uint8_t*)&this->smallbuf->data[0],
-			.output_size=SHA256_BLOCK_SIZE};
-	} else if(addr.bytes[0] == 3) {
-		int64_t gas = (msg.input_size+31)/32*RIPEMD160_PER_WORD_GAS + RIPEMD160_BASE_GAS;
-		if(gas > msg.gas) {
-			return evmc_result{.status_code=EVMC_OUT_OF_GAS};
-		}
-		ripemd160(msg.input_data, msg.input_size, (uint8_t*)&this->smallbuf->data[0]);
-		return evmc_result{
-			.status_code=EVMC_SUCCESS,
-			.gas_left=int64_t(msg.gas-gas),
-			.output_data=(uint8_t*)&this->smallbuf->data[0],
-			.output_size=RIPEMD160_DIGEST_LENGTH};
-	} else if(addr.bytes[0] == 4) {
-		int64_t gas = (msg.input_size+31)/32*IDENTITY_PER_WORD_GAS + IDENTITY_BASE_GAS;
-		if(gas > msg.gas) {
-			return evmc_result{.status_code=EVMC_OUT_OF_GAS};
-		}
-		return evmc_result{
-			.status_code=EVMC_SUCCESS,
-			.gas_left=int64_t(msg.gas-gas),
-			.output_data=msg.input_data,
-			.output_size=msg.input_size};
+	if(addr.bytes[18] == 0 && addr.bytes[19] == 2) {
+		return run_precompiled_contract_sha256();
+	} else if(addr.bytes[18] == 0 && addr.bytes[19] == 3) {
+		return run_precompiled_contract_ripemd160();
+	} else if(addr.bytes[18] == 0 && addr.bytes[19] == 4) {
+		return run_precompiled_contract_echo();
+	} else if(addr.bytes[18] == SEP_CONTRACT_ADDR_BYTE_18 && addr.bytes[19] == SEP101_CONTRACT_ADDR_BYTE_19) {
+		return run_precompiled_contract_sep101();
 	}
 	// the others use golang implementations
 	int ret_value, out_of_gas, osize;
@@ -442,6 +420,51 @@ evmc_result evmc_host_context::run_precompiled_contract(const evmc_address& addr
 		.gas_left=int64_t(gas_left),
 		.output_data=(uint8_t*)&this->smallbuf->data[0],
 		.output_size=uint64_t(osize)};
+}
+
+inline void sha256(const uint8_t* data, size_t size, uint8_t* out) {
+	SHA256_CTX ctx;
+	sha256_init(&ctx);
+	sha256_update(&ctx, data, size);
+	sha256_final(&ctx, out);
+}
+
+evmc_result evmc_host_context::run_precompiled_contract_sha256() {
+	int64_t gas = (msg.input_size+31)/32*SHA256_PER_WORD_GAS + SHA256_BASE_GAS;
+	if(gas > msg.gas) {
+		return evmc_result{.status_code=EVMC_OUT_OF_GAS};
+	}
+	sha256(msg.input_data, msg.input_size, (uint8_t*)&this->smallbuf->data[0]);
+	return evmc_result{
+		.status_code=EVMC_SUCCESS,
+		.gas_left=int64_t(msg.gas-gas),
+		.output_data=(uint8_t*)&this->smallbuf->data[0],
+		.output_size=SHA256_BLOCK_SIZE};
+}
+
+evmc_result evmc_host_context::run_precompiled_contract_ripemd160() {
+	int64_t gas = (msg.input_size+31)/32*RIPEMD160_PER_WORD_GAS + RIPEMD160_BASE_GAS;
+	if(gas > msg.gas) {
+		return evmc_result{.status_code=EVMC_OUT_OF_GAS};
+	}
+	ripemd160(msg.input_data, msg.input_size, (uint8_t*)&this->smallbuf->data[0]);
+	return evmc_result{
+		.status_code=EVMC_SUCCESS,
+		.gas_left=int64_t(msg.gas-gas),
+		.output_data=(uint8_t*)&this->smallbuf->data[0],
+		.output_size=RIPEMD160_DIGEST_LENGTH};
+}
+
+evmc_result evmc_host_context::run_precompiled_contract_echo() {
+	int64_t gas = (msg.input_size+31)/32*IDENTITY_PER_WORD_GAS + IDENTITY_BASE_GAS;
+	if(gas > msg.gas) {
+		return evmc_result{.status_code=EVMC_OUT_OF_GAS};
+	}
+	return evmc_result{
+		.status_code=EVMC_SUCCESS,
+		.gas_left=int64_t(msg.gas-gas),
+		.output_data=msg.input_data, //forward input to output
+		.output_size=msg.input_size};
 }
 
 evmc_result evmc_host_context::run_vm(size_t snapshot) {
@@ -676,3 +699,74 @@ int64_t zero_depth_call(evmc_uint256be gas_price,
 	vm->destroy(vm);
 	return gas_estimated;
 }
+
+// ========================= KV =========================
+inline uint32_t get_selector(const uint8_t* data) {
+	return  (uint32_t(data[3])<<24)|
+		(uint32_t(data[2])<<16)|
+		(uint32_t(data[1])<<8)|
+		 uint32_t(data[0]);
+}
+
+evmc_result evmc_host_context::run_precompiled_contract_sep101() {
+	if(msg.input_size < 4 || msg.input_size > 4 + 32*2 + MAX_KEY_SIZE + MAX_VALUE_SIZE) {
+		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
+	}
+	uint32_t selector = get_selector(msg.input_data);
+	uint256 key_len_256 = beptr_to_u256(msg.input_data);
+	if(key_len_256 ==0 && key_len_256 > MAX_KEY_SIZE) {
+		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
+	}
+	size_t key_len = size_t(key_len_256);
+	size_t key_words = key_len/32;
+	if(msg.input_size < 4 + 32 + key_words*32) {
+		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
+	}
+	evmc_bytes32 key_hash;
+	sha256(msg.input_data + 4, key_len, key_hash.bytes);
+	if(selector == SELECTOR_KV_GET) {
+		const bytes& bz = txctrl->get_value(msg.sender, key_hash);
+		int64_t gas = bz.size() * KV_GET_GAS_PER_BYTE;
+		if(gas > msg.gas) {
+			return evmc_result{.status_code=EVMC_OUT_OF_GAS};
+		}
+		size_t word_count = 1 + bz.size()/32;
+		uint8_t* buffer = (uint8_t*)malloc(word_count*32);
+		memset(buffer, 0, word_count*32);
+		if(bz.size() != 0) {
+			u256_to_beptr(uint256(bz.size()), buffer);
+			memcpy(buffer + 32, bz.data(), bz.size());
+		}
+		return evmc_result{
+			.status_code=EVMC_SUCCESS,
+			.gas_left=int64_t(msg.gas-gas),
+			.release = evmc_free_result_memory,
+			.output_data=buffer,
+			.output_size=word_count*32};
+	}
+	if(selector != SELECTOR_KV_SET) {
+		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
+	}
+	if(msg.input_size < 4 + 32 + key_words*32 + 32) {
+		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
+	}
+	const uint8_t* value_ptr = msg.input_data + 4 + 32 + key_words*32;
+	uint256 value_len_256 = beptr_to_u256(value_ptr);
+	if(value_len_256 > MAX_VALUE_SIZE) {
+		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
+	}
+	size_t value_len = size_t(value_len_256);
+	int64_t gas = value_len * KV_SET_GAS_PER_BYTE;
+	if(gas > msg.gas) {
+		return evmc_result{.status_code=EVMC_OUT_OF_GAS};
+	}
+	if(msg.input_size < 4 + 32 + key_words*32 + 32 + value_len) {
+		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
+	}
+	txctrl->set_value(msg.sender, key_hash, bytes_info{.data=value_ptr+32, .size=value_len});
+
+	return evmc_result{
+		.status_code=EVMC_SUCCESS,
+		.gas_left=int64_t(msg.gas-gas)};
+}
+

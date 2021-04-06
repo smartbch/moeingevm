@@ -5,6 +5,11 @@
 
 const uint64_t MAX_UINT64 = ~uint64_t(0);
 const uint64_t MAX_CODE_SIZE = 24576; // 24k
+const uint64_t MAX_KEY_SIZE = 256;
+const uint64_t MAX_VALUE_SIZE = 24576; // 24k
+
+const uint32_t SELECTOR_KV_GET = 0;
+const uint32_t SELECTOR_KV_SET = 0;
 
 const bool SELFDESTRUCT_BENEFICIARY_CANNOT_BE_PRECOMPILED = false;
 
@@ -88,6 +93,11 @@ public:
 
 	void load_code(const evmc_address& addr);
 	evmc_result run_precompiled_contract(const evmc_address& addr);
+	evmc_result run_precompiled_contract_sha256();
+	evmc_result run_precompiled_contract_ripemd160();
+	evmc_result run_precompiled_contract_echo();
+	evmc_result run_precompiled_contract_sep101();
+	//evmc_result run_precompiled_contract_sep206();
 	evmc_result call(const evmc_message& msg);
 	evmc_result call();
 	evmc_result run_vm(size_t snapshot);

@@ -39,8 +39,19 @@ inline evmc_uint256be u256_to_u256be(const uint256& u) {
 	return result;
 }
 
+inline void u256_to_beptr(const uint256& u, uint8_t* ptr) {
+	intx::uint256 v = intx::bswap(u);
+	memcpy(ptr, &v, 32);
+}
+
 inline uint256 u256be_to_u256(const evmc_uint256be& a) {
 	return intx::be::load<uint256, 32>(a.bytes);
+}
+
+inline uint256 beptr_to_u256(const uint8_t* ptr) {
+	evmc_uint256be a;
+	memcpy(a.bytes, ptr, 32);
+	return u256be_to_u256(a);
 }
 
 // Given 0 <= i <= 15, outputs its dex presentation
@@ -418,6 +429,13 @@ const uint64_t RIPEMD160_BASE_GAS = 600;
 const uint64_t RIPEMD160_PER_WORD_GAS = 120;
 const uint64_t IDENTITY_BASE_GAS = 15;
 const uint64_t IDENTITY_PER_WORD_GAS = 3;
+const uint64_t KV_BASE_GAS = 60;
+const uint64_t KV_GET_GAS_PER_BYTE = 15;
+const uint64_t KV_SET_GAS_PER_BYTE = 15;
+
+const uint8_t SEP_CONTRACT_ADDR_BYTE_18 = 0x27;
+const uint8_t SEP101_CONTRACT_ADDR_BYTE_19 = 0x11;
+const uint8_t SEP206_CONTRACT_ADDR_BYTE_19 = 0x12;
 
 const uint64_t CREATE_DATA_GAS = 200;
 const uint64_t TX_GAS  = 21000; // Per transaction not creating a contract.
