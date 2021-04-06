@@ -724,9 +724,9 @@ evmc_result evmc_host_context::run_precompiled_contract_sep101() {
 	}
 	evmc_bytes32 key_hash;
 	sha256(msg.input_data + 4, key_len, key_hash.bytes);
-	if(selector == SELECTOR_KV_GET) {
+	if(selector == SELECTOR_SEP101_GET) {
 		const bytes& bz = txctrl->get_value(msg.sender, key_hash);
-		int64_t gas = bz.size() * KV_GET_GAS_PER_BYTE;
+		int64_t gas = bz.size() * SEP101_GET_GAS_PER_BYTE;
 		if(gas > msg.gas) {
 			return evmc_result{.status_code=EVMC_OUT_OF_GAS};
 		}
@@ -744,7 +744,7 @@ evmc_result evmc_host_context::run_precompiled_contract_sep101() {
 			.output_data=buffer,
 			.output_size=word_count*32};
 	}
-	if(selector != SELECTOR_KV_SET) {
+	if(selector != SELECTOR_SEP101_SET) {
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	if(msg.input_size < 4 + 32 + key_words*32 + 32) {
@@ -756,7 +756,7 @@ evmc_result evmc_host_context::run_precompiled_contract_sep101() {
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	size_t value_len = size_t(value_len_256);
-	int64_t gas = value_len * KV_SET_GAS_PER_BYTE;
+	int64_t gas = value_len * SEP101_SET_GAS_PER_BYTE;
 	if(gas > msg.gas) {
 		return evmc_result{.status_code=EVMC_OUT_OF_GAS};
 	}
@@ -768,5 +768,251 @@ evmc_result evmc_host_context::run_precompiled_contract_sep101() {
 	return evmc_result{
 		.status_code=EVMC_SUCCESS,
 		.gas_left=int64_t(msg.gas-gas)};
+}
+
+// ========================= SEP206 =========================
+
+static inline evmc_result evmc_result_from_str(const std::string& str, uint64_t gas) {
+	uint8_t* buffer = (uint8_t*)malloc(64);
+	memset(buffer, 0, 64);
+	buffer[31] = str.size();
+	memcpy(buffer+32, str.data(), str.size());
+	return evmc_result{
+		.status_code=EVMC_SUCCESS,
+		.gas_left=int64_t(gas),
+		.release = evmc_free_result_memory,
+		.output_data=buffer,
+		.output_size=64};
+}
+
+static inline evmc_result evmc_result_from_int(int64_t value, uint64_t gas) {
+	uint8_t* buffer = (uint8_t*)malloc(32);
+	memset(buffer, 0, 32);
+	u256_to_beptr(uint256(value), buffer);
+	return evmc_result{
+		.status_code=EVMC_SUCCESS,
+		.gas_left=int64_t(gas),
+		.release = evmc_free_result_memory,
+		.output_data=buffer,
+		.output_size=64};
+}
+
+//    function balanceOf(address owner) external view returns (uint);
+evmc_result evmc_host_context::sep206_balanceOf() {
+	if(msg.input_size != 4 + 32) {
+		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
+	}
+	evmc_address addr;
+	memcpy(addr.bytes, msg.input_data + 4 + 12, 20);
+	evmc_uint256be balance = get_balance(addr);
+	uint8_t* buffer = (uint8_t*)malloc(32);
+	memcpy(buffer, balance.bytes, 32);
+	return evmc_result{
+		.status_code=EVMC_SUCCESS,
+		.gas_left=int64_t(msg.gas),
+		.release = evmc_free_result_memory,
+		.output_data=buffer,
+		.output_size=32};
+		
+}
+
+//    function allowance(address owner, address spender) external view returns (uint);
+evmc_result evmc_host_context::sep206_allowance() {
+	if(msg.input_size != 4 + 64) {
+		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
+	}
+	evmc_bytes32 key;
+	sha256(msg.input_data, msg.input_size, key.bytes);
+	evmc_bytes32 allowance = get_storage(msg.destination, key);
+	uint8_t* buffer = (uint8_t*)malloc(32);
+	memcpy(buffer, allowance.bytes, 32);
+	return evmc_result{
+		.status_code=EVMC_SUCCESS,
+		.gas_left=int64_t(msg.gas),
+		.release = evmc_free_result_memory,
+		.output_data=buffer,
+		.output_size=32};
+}
+
+//    function approve(address spender, uint value) external returns (bool);
+evmc_result evmc_host_context::sep206_approve(bool new_value, bool increase) {
+	if(msg.input_size != 4 + 64) {
+		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
+	}
+	uint8_t owner_and_spender[64]; 
+	memset(owner_and_spender, 0, 64);
+	memcpy(owner_and_spender + 12, msg.sender.bytes, 20);
+	memcpy(owner_and_spender + 32 + 12, msg.input_data + 4 + 12, 20);
+	evmc_bytes32 key;
+	sha256(owner_and_spender, 64, key.bytes);
+	evmc_bytes32 value;
+	memcpy(value.bytes, msg.input_data + 4 + 32, 32);
+	if(new_value) {
+		set_storage(msg.destination, key, value);
+	} else {
+		evmc_bytes32 allowance = get_storage(msg.destination, key);
+		uint256 allowance_value = beptr_to_u256(allowance.bytes);
+		uint256 delta = beptr_to_u256(value.bytes);
+		if(increase) {
+			allowance_value += delta;
+			if(allowance_value < delta) { //overflow
+				allowance_value = ~uint256(0);
+			}
+		} else if (allowance_value > delta) {
+			allowance_value -= delta;
+		} else {
+			allowance_value = 0;
+		}
+		u256_to_beptr(allowance_value, allowance.bytes);
+		set_storage(msg.destination, key, allowance);
+	}
+	uint8_t* buffer = (uint8_t*)malloc(32);
+	memset(buffer, 0, 32);
+	buffer[31] = 1;
+	return evmc_result{
+		.status_code=EVMC_SUCCESS,
+		.gas_left=int64_t(msg.gas),
+		.release = evmc_free_result_memory,
+		.output_data=buffer,
+		.output_size=32};
+}
+
+//    function transfer(address to, uint value) external returns (bool);
+evmc_result evmc_host_context::sep206_transfer() {
+	if(msg.input_size != 4 + 64) {
+		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
+	}
+	evmc_address target;
+	memcpy(target.bytes, msg.input_data + 4 + 12, 20);
+	evmc_uint256be amount_be;
+	memcpy(amount_be.bytes, msg.input_data + 4 + 32, 32);
+	uint256 amount = u256be_to_u256(amount_be);
+	evmc_uint256be balance_be = get_balance(msg.sender);
+	uint256 balance = u256be_to_u256(balance_be);
+	if(balance < amount) {
+		return evmc_result{.status_code=EVMC_BALANCE_NOT_ENOUGH};
+	}
+	txctrl->transfer(msg.sender, target, amount);
+	uint8_t* buffer = (uint8_t*)malloc(32);
+	memset(buffer, 0, 32);
+	buffer[31] = 1;
+	return evmc_result{
+		.status_code=EVMC_SUCCESS,
+		.gas_left=int64_t(msg.gas),
+		.release = evmc_free_result_memory,
+		.output_data=buffer,
+		.output_size=32};
+}
+
+//    function transferFrom(address from, address to, uint value) external returns (bool);
+evmc_result evmc_host_context::sep206_transferFrom() {
+	if(msg.input_size != 4 + 96) {
+		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
+	}
+	evmc_address source, target;
+	memcpy(source.bytes, msg.input_data + 4 + 12, 20);
+	memcpy(target.bytes, msg.input_data + 4 + 32 + 12, 20);
+	evmc_uint256be amount_be;
+	memcpy(amount_be.bytes, msg.input_data + 4 + 32 + 32, 32);
+	uint256 amount = u256be_to_u256(amount_be);
+	evmc_uint256be balance_be = get_balance(msg.sender);
+	uint256 balance = u256be_to_u256(balance_be);
+	if(balance < amount) {
+		return evmc_result{.status_code=EVMC_BALANCE_NOT_ENOUGH};
+	}
+	evmc_bytes32 key;
+	sha256(msg.input_data + 4, 64, key.bytes);
+	evmc_bytes32 allowance = get_storage(msg.destination, key);
+	uint256 allowance_value = beptr_to_u256(allowance.bytes);
+	if(allowance_value < amount) {
+		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
+	}
+	txctrl->transfer(msg.sender, target, amount);
+	allowance_value -= amount;
+	u256_to_beptr(allowance_value, allowance.bytes);
+	set_storage(msg.destination, key, allowance);
+	uint8_t* buffer = (uint8_t*)malloc(32);
+	memset(buffer, 0, 32);
+	buffer[31] = 1;
+	return evmc_result{
+		.status_code=EVMC_SUCCESS,
+		.gas_left=int64_t(msg.gas),
+		.release = evmc_free_result_memory,
+		.output_data=buffer,
+		.output_size=32};
+}
+
+evmc_result evmc_host_context::run_precompiled_contract_sep206() {
+	if(msg.input_size < 4) {
+		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
+	}
+	uint32_t selector = get_selector(msg.input_data);
+	uint64_t gas;
+	switch(selector) {
+		case SELECTOR_SEP206_NAME:
+			gas = SEP206_NAME_GAS;
+		break;
+		case SELECTOR_SEP206_SYMBOL:
+			gas = SEP206_SYMBOL_GAS;
+		break;
+		case SELECTOR_SEP206_DECIMALS:
+			gas = SEP206_DECIMALS_GAS;
+		break;
+		case SELECTOR_SEP206_TOTALSUPPLY:
+			gas = SEP206_TOTALSUPPLY_GAS;
+		break;
+		case SELECTOR_SEP206_BALANCEOF:
+			gas = SEP206_BALANCEOF_GAS;
+		break;
+		case SELECTOR_SEP206_ALLOWANCE:
+			gas = SEP206_ALLOWANCE_GAS;
+		break;
+		case SELECTOR_SEP206_APPROVE:
+			gas = SEP206_APPROVE_GAS;
+		break;
+		case SELECTOR_SEP206_INCREASEALLOWANCE:
+			gas = SEP206_INCREASEALLOWANCE_GAS;
+		break;
+		case SELECTOR_SEP206_DECREASEALLOWANCE:
+			gas = SEP206_DECREASEALLOWANCE_GAS;
+		break;
+		case SELECTOR_SEP206_TRANSFER:
+			gas = SEP206_TRANSFER_GAS;
+		break;
+		case SELECTOR_SEP206_TRANSFERFROM:
+			gas = SEP206_TRANSFERFROM_GAS;
+		break;
+		default:
+			return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
+	}
+	if(gas > msg.gas) {
+		return evmc_result{.status_code=EVMC_OUT_OF_GAS};
+	}
+	msg.gas -= gas;
+	switch(selector) {
+		case SELECTOR_SEP206_NAME:
+			return evmc_result_from_str("BCH", msg.gas);
+		case SELECTOR_SEP206_SYMBOL:
+			return evmc_result_from_str("BCH", msg.gas);
+		case SELECTOR_SEP206_DECIMALS:
+			return evmc_result_from_int(18, msg.gas);
+		case SELECTOR_SEP206_TOTALSUPPLY:
+			return evmc_result_from_int(2100*10000, msg.gas);
+		case SELECTOR_SEP206_BALANCEOF:
+			return sep206_balanceOf();
+		case SELECTOR_SEP206_ALLOWANCE:
+			return sep206_allowance();
+		case SELECTOR_SEP206_APPROVE:
+			return sep206_approve(true, false);
+		case SELECTOR_SEP206_INCREASEALLOWANCE:
+			return sep206_approve(false, true);
+		case SELECTOR_SEP206_DECREASEALLOWANCE:
+			return sep206_approve(false, false);
+		case SELECTOR_SEP206_TRANSFER:
+			return sep206_transfer();
+		case SELECTOR_SEP206_TRANSFERFROM:
+			return sep206_transferFrom();
+	}
+	return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 }
 

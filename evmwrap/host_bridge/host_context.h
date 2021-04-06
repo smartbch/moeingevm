@@ -8,8 +8,45 @@ const uint64_t MAX_CODE_SIZE = 24576; // 24k
 const uint64_t MAX_KEY_SIZE = 256;
 const uint64_t MAX_VALUE_SIZE = 24576; // 24k
 
-const uint32_t SELECTOR_KV_GET = 0;
-const uint32_t SELECTOR_KV_SET = 0;
+const uint32_t SELECTOR_SEP101_GET = 0;
+const uint32_t SELECTOR_SEP101_SET = 1;
+const uint32_t SELECTOR_SEP206_NAME = 0;
+const uint32_t SELECTOR_SEP206_SYMBOL = 1;
+const uint32_t SELECTOR_SEP206_DECIMALS = 2;
+const uint32_t SELECTOR_SEP206_TOTALSUPPLY = 3;
+const uint32_t SELECTOR_SEP206_BALANCEOF = 4;
+const uint32_t SELECTOR_SEP206_ALLOWANCE = 5;
+const uint32_t SELECTOR_SEP206_APPROVE = 6;
+const uint32_t SELECTOR_SEP206_INCREASEALLOWANCE = 7;
+const uint32_t SELECTOR_SEP206_DECREASEALLOWANCE = 8;
+const uint32_t SELECTOR_SEP206_TRANSFER = 9;
+const uint32_t SELECTOR_SEP206_TRANSFERFROM = 10;
+
+const uint64_t SHA256_BASE_GAS = 60;
+const uint64_t SHA256_PER_WORD_GAS = 12;
+const uint64_t RIPEMD160_BASE_GAS = 600;
+const uint64_t RIPEMD160_PER_WORD_GAS = 120;
+const uint64_t IDENTITY_BASE_GAS = 15;
+const uint64_t IDENTITY_PER_WORD_GAS = 3;
+const uint64_t SEP101_BASE_GAS = 60;
+const uint64_t SEP101_GET_GAS_PER_BYTE = 15;
+const uint64_t SEP101_SET_GAS_PER_BYTE = 15;
+const uint32_t SEP206_NAME_GAS = 0;
+const uint32_t SEP206_SYMBOL_GAS = 0;
+const uint32_t SEP206_DECIMALS_GAS = 0;
+const uint32_t SEP206_TOTALSUPPLY_GAS = 0;
+const uint32_t SEP206_BALANCEOF_GAS = 0;
+const uint32_t SEP206_ALLOWANCE_GAS = 0;
+const uint32_t SEP206_APPROVE_GAS = 0;
+const uint32_t SEP206_INCREASEALLOWANCE_GAS = 0;
+const uint32_t SEP206_DECREASEALLOWANCE_GAS = 0;
+const uint32_t SEP206_TRANSFER_GAS = 0;
+const uint32_t SEP206_TRANSFERFROM_GAS = 0;
+
+const uint8_t SEP_CONTRACT_ADDR_BYTE_18 = 0x27;
+const uint8_t SEP101_CONTRACT_ADDR_BYTE_19 = 0x11;
+const uint8_t SEP206_CONTRACT_ADDR_BYTE_19 = 0x12;
+
 
 const bool SELFDESTRUCT_BENEFICIARY_CANNOT_BE_PRECOMPILED = false;
 
@@ -97,7 +134,12 @@ public:
 	evmc_result run_precompiled_contract_ripemd160();
 	evmc_result run_precompiled_contract_echo();
 	evmc_result run_precompiled_contract_sep101();
-	//evmc_result run_precompiled_contract_sep206();
+	evmc_result run_precompiled_contract_sep206();
+	evmc_result sep206_balanceOf();
+	evmc_result sep206_allowance();
+	evmc_result sep206_approve(bool new_value, bool increase);
+	evmc_result sep206_transfer();
+	evmc_result sep206_transferFrom();
 	evmc_result call(const evmc_message& msg);
 	evmc_result call();
 	evmc_result run_vm(size_t snapshot);

@@ -423,20 +423,6 @@ const uint64_t SSTORE_RESET_GAS = 5000;
 const uint64_t SSTORE_CLEARS_SCHEDULE = 15000;
 const uint64_t SELFDESTRUCT_REFUND_GAS = 24000;
 
-const uint64_t SHA256_BASE_GAS = 60;
-const uint64_t SHA256_PER_WORD_GAS = 12;
-const uint64_t RIPEMD160_BASE_GAS = 600;
-const uint64_t RIPEMD160_PER_WORD_GAS = 120;
-const uint64_t IDENTITY_BASE_GAS = 15;
-const uint64_t IDENTITY_PER_WORD_GAS = 3;
-const uint64_t KV_BASE_GAS = 60;
-const uint64_t KV_GET_GAS_PER_BYTE = 15;
-const uint64_t KV_SET_GAS_PER_BYTE = 15;
-
-const uint8_t SEP_CONTRACT_ADDR_BYTE_18 = 0x27;
-const uint8_t SEP101_CONTRACT_ADDR_BYTE_19 = 0x11;
-const uint8_t SEP206_CONTRACT_ADDR_BYTE_19 = 0x12;
-
 const uint64_t CREATE_DATA_GAS = 200;
 const uint64_t TX_GAS  = 21000; // Per transaction not creating a contract.
 const uint64_t TX_GAS_CONTRACT_CREATION = 53000; // Per transaction that creates a contract.
