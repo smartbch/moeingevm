@@ -21,3 +21,4 @@
 evmwrap/evmtests/evmtests
 *.txt
 *.swp
+evmwrap/evmtests/run_test_file
