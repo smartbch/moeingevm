@@ -22,5 +22,6 @@ type TxExecutor interface {
 	//collect infos, not thread safe
 	CollectTxsCount() int
 	CommittedTxs() []*types.Transaction
-	GasUsedInfo() (gasUsed uint64, gasFee uint256.Int)
+	GasUsedInfo() (gasUsed uint64, gasRefund, gasFee uint256.Int)
+	StandbyQLen() int
 }

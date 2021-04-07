@@ -2,7 +2,7 @@ package ebp
 
 import (
 	"encoding/binary"
-	"fmt"
+	"errors"
 	"sync"
 	"sync/atomic"
 
@@ -39,8 +39,9 @@ type txEngine struct {
 	signer       gethtypes.Signer
 	currentBlock *types.BlockInfo
 
-	cumulativeGasUsed uint64
-	cumulativeGasFee  *uint256.Int
+	cumulativeGasUsed   uint64
+	cumulativeGasRefund *uint256.Int
+	cumulativeGasFee    *uint256.Int
 }
 
 func (exec *txEngine) Context() *types.Context {
@@ -98,6 +99,7 @@ func (exec *txEngine) Prepare() {
 			}
 		}
 	}
+	var totalGasFee uint256.Int
 	for i := range infoList {
 		if !infoList[i].valid {
 			//skip it if account does not exist or signature is invalid
@@ -112,17 +114,14 @@ func (exec *txEngine) Prepare() {
 		}
 		addr2nonce[sender]++
 		idx := addr2idx[sender]
-		acc := ctxAA[idx].ctx.GetAccount(sender) // read cached account
-		x := acc.Balance()
-		x.Sub(x, &infoList[i].gasFee)
-		if x.Cmp(acc.Balance()) == 1 {
-			//skip it if balance cannot pay gasfee
+		err := SubSenderAccBalance(&ctxAA[idx].ctx, sender, &infoList[i].gasFee)
+		if err != nil {
 			infoList[i].valid = false
 			infoList[i].statusStr = "not enough balance to pay gasfee"
 			continue
+		} else {
+			totalGasFee.Add(&totalGasFee, &infoList[i].gasFee)
 		}
-		acc.UpdateBalance(x)
-		ctxAA[idx].ctx.SetAccount(sender, acc)
 		ctxAA[idx].changed = true //now this rabbit needs writeback
 	}
 	for i := range ctxAA {
@@ -131,6 +130,7 @@ func (exec *txEngine) Prepare() {
 	// the value of exec.parallelNum and the speeds of goroutines must have
 	// no effects on the order of TXs in standby queue.
 	ctx := exec.cleanCtx.WithRbtCopy()
+	_ = AddSystemAccBalance(ctx, &totalGasFee)
 	exec.insertToStandbyTxQ(ctx, infoList)
 	exec.txList = exec.txList[:0] // clear txList after consumption
 	//write ctx state to trunk
@@ -230,6 +230,9 @@ func (exec *txEngine) recordInvalidTx(info preparedInfo) {
 // Fetch TXs from standby queue and execute them
 func (exec *txEngine) Execute(currBlock *types.BlockInfo) {
 	exec.committedTxs = exec.committedTxs[:0]
+	exec.cumulativeGasUsed = 0
+	exec.cumulativeGasRefund = uint256.NewInt().SetUint64(0)
+	exec.cumulativeGasFee = uint256.NewInt().SetUint64(0)
 	exec.currentBlock = currBlock
 	startKey, endKey := exec.getStandbyQueueRange()
 	if startKey == endKey {
@@ -378,6 +381,8 @@ func (exec *txEngine) checkTxDepsAndUptStandbyQ(txRange *TxRange, standbyTxList 
 			ctx.Rbt.Set(newK, tx.ToBytes()) // insert the failed TXs back into standby queue
 			Runners[idx] = nil
 		} else if status == types.ACCOUNT_NOT_EXIST || status == types.TX_NONCE_TOO_SMALL {
+			//collect invalid tx`s all gas
+			exec.cumulativeGasUsed += Runners[idx].Tx.Gas
 			Runners[idx] = nil
 		}
 	}
@@ -386,12 +391,11 @@ func (exec *txEngine) checkTxDepsAndUptStandbyQ(txRange *TxRange, standbyTxList 
 
 // Fill 'exec.committedTxs' with 'committableTxList'
 func (exec *txEngine) collectCommittableTxs(committableTxList []*TxRunner) {
-	exec.cumulativeGasUsed = 0
-	exec.cumulativeGasFee = uint256.NewInt().SetUint64(0)
 	var logIndex uint
 	for idx, runner := range committableTxList {
-		fmt.Printf("gasUsed in tx: %d, gasPrice in tx: %d\n", runner.GasUsed, uint256.NewInt().SetBytes(runner.Tx.GasPrice[:]).Uint64())
+		//fmt.Printf("gasUsed in tx: %d, gasPrice in tx: %d\n", runner.GasUsed, uint256.NewInt().SetBytes(runner.Tx.GasPrice[:]).Uint64())
 		exec.cumulativeGasUsed += runner.GasUsed
+		exec.cumulativeGasRefund.Add(exec.cumulativeGasRefund, &runner.GasRefund)
 		exec.cumulativeGasFee.Add(exec.cumulativeGasFee,
 			uint256.NewInt().Mul(uint256.NewInt().SetUint64(runner.GasUsed),
 				uint256.NewInt().SetBytes(runner.Tx.GasPrice[:])))
@@ -464,11 +468,16 @@ func (exec *txEngine) CollectTxsCount() int {
 	return len(exec.txList)
 }
 
-func (exec *txEngine) GasUsedInfo() (gasUsed uint64, gasFee uint256.Int) {
+func (exec *txEngine) GasUsedInfo() (gasUsed uint64, gasRefund, gasFee uint256.Int) {
 	if exec.cumulativeGasFee == nil {
-		return exec.cumulativeGasUsed, uint256.Int{}
+		return exec.cumulativeGasUsed, *exec.cumulativeGasRefund, uint256.Int{}
 	}
-	return exec.cumulativeGasUsed, *exec.cumulativeGasFee
+	return exec.cumulativeGasUsed, *exec.cumulativeGasRefund, *exec.cumulativeGasFee
+}
+
+func (exec *txEngine) StandbyQLen() int {
+	s, e := exec.getStandbyQueueRange()
+	return int(e - s)
 }
 
 func parallelRun(workerCount int, fn func(workerID int)) {
@@ -481,4 +490,70 @@ func parallelRun(workerCount int, fn func(workerID int)) {
 		}(i)
 	}
 	wg.Wait()
+}
+
+var (
+	// record pending gas fee and refund
+	systemContractAddress = [20]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		byte('s'), byte('y'), byte('s'), byte('t'), byte('e'), byte('m')}
+	// record distribute fee
+	blackHoleContractAddress = [20]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		byte('b'), byte('l'), byte('a'), byte('c'), byte('k'), byte('h'), byte('o'), byte('l'), byte('e')}
+)
+
+// guarantee account exists externally
+func SubSenderAccBalance(ctx *types.Context, sender common.Address, amount *uint256.Int) error {
+	return updateBalance(ctx, sender, amount, false)
+}
+
+func AddSystemAccBalance(ctx *types.Context, amount *uint256.Int) error {
+	return updateBalance(ctx, systemContractAddress, amount, true)
+}
+
+func SubSystemAccBalance(ctx *types.Context, amount *uint256.Int) error {
+	return updateBalance(ctx, systemContractAddress, amount, false)
+}
+
+func TransferFromSystemAccToBlackHoleAcc(ctx *types.Context, amount *uint256.Int) error {
+	err := updateBalance(ctx, systemContractAddress, amount, false)
+	if err != nil {
+		return err
+	}
+	return updateBalance(ctx, blackHoleContractAddress, amount, true)
+}
+
+// will lazy init account if acc not exist
+func updateBalance(ctx *types.Context, address common.Address, amount *uint256.Int, isAdd bool) error {
+	acc := ctx.GetAccount(address)
+	if acc == nil {
+		//lazy init
+		acc = types.ZeroAccountInfo()
+	}
+	s := acc.Balance()
+	if isAdd {
+		acc.UpdateBalance(s.Add(s, amount))
+	} else {
+		if s.Cmp(amount) < 0 {
+			return errors.New("balance not enough")
+		}
+		acc.UpdateBalance(s.Sub(s, amount))
+	}
+	ctx.SetAccount(address, acc)
+	return nil
+}
+
+func GetSystemBalance(ctx *types.Context) *uint256.Int {
+	acc := ctx.GetAccount(systemContractAddress)
+	if acc == nil {
+		acc = types.ZeroAccountInfo()
+	}
+	return acc.Balance()
+}
+
+func GetBlackHoleBalance(ctx *types.Context) *uint256.Int {
+	acc := ctx.GetAccount(blackHoleContractAddress)
+	if acc == nil {
+		acc = types.ZeroAccountInfo()
+	}
+	return acc.Balance()
 }
