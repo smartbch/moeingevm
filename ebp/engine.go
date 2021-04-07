@@ -514,8 +514,8 @@ func SubSystemAccBalance(ctx *types.Context, amount *uint256.Int) error {
 	return updateBalance(ctx, systemContractAddress, amount, false)
 }
 
-func TransferFromSystemAccToBlackHoleAcc(ctx *types.Context, amount *uint256.Int) error {
-	err := updateBalance(ctx, systemContractAddress, amount, false)
+func TransferFromSenderAccToBlackHoleAcc(ctx *types.Context, sender common.Address, amount *uint256.Int) error {
+	err := updateBalance(ctx, sender, amount, false)
 	if err != nil {
 		return err
 	}
