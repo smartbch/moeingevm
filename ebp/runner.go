@@ -288,7 +288,6 @@ func (runner *TxRunner) collectResult(result *all_changed, ret_value *evmc_resul
 		return
 	}
 	runner.OutData = C.GoBytes(unsafe.Pointer(ret_value.output_data), C.int(ret_value.output_size))
-	fmt.Printf("Now OutData %#v\n", runner.OutData)
 	size := int(result.account_num)
 	if size != 0 {
 		accounts := (*[1 << 30]changed_account)(unsafe.Pointer(result.accounts))[:size:size]

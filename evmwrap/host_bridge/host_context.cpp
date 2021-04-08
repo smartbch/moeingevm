@@ -791,10 +791,10 @@ static inline evmc_result evmc_result_from_str(const std::string& str, uint64_t 
 		.output_size=96};
 }
 
-static inline evmc_result evmc_result_from_int(int64_t value, uint64_t gas) {
+static inline evmc_result evmc_result_from_uint256(uint256 value, uint64_t gas) {
 	uint8_t* buffer = (uint8_t*)malloc(32);
 	memset(buffer, 0, 32);
-	u256_to_beptr(uint256(value), buffer);
+	u256_to_beptr(value, buffer);
 	return evmc_result{
 		.status_code=EVMC_SUCCESS,
 		.gas_left=int64_t(gas),
@@ -991,9 +991,9 @@ evmc_result evmc_host_context::run_precompiled_contract_sep206() {
 		case SELECTOR_SEP206_SYMBOL:
 			return evmc_result_from_str("BCH", msg.gas);
 		case SELECTOR_SEP206_DECIMALS:
-			return evmc_result_from_int(18, msg.gas);
+			return evmc_result_from_uint256(uint256(18), msg.gas);
 		case SELECTOR_SEP206_TOTALSUPPLY:
-			return evmc_result_from_int(2100*10000, msg.gas);
+			return evmc_result_from_uint256(uint256(2100*10000)*uint256(1000000000000000000), msg.gas);
 		case SELECTOR_SEP206_BALANCEOF:
 			return sep206_balanceOf();
 		case SELECTOR_SEP206_ALLOWANCE:
