@@ -1,7 +1,6 @@
 package ebp
 
 import (
-	"fmt"
 	"encoding/binary"
 	"runtime"
 	"sync/atomic"
