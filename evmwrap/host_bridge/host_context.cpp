@@ -389,13 +389,10 @@ evmc_result evmc_host_context::call() {
 
 evmc_result evmc_host_context::run_precompiled_contract(const evmc_address& addr) {
 	if(addr.bytes[18] == 0 && addr.bytes[19] == 2) {
-		std::cout<<"HERE! run_precompiled_contract sha256"<<std::endl;
 		return run_precompiled_contract_sha256();
 	} else if(addr.bytes[18] == 0 && addr.bytes[19] == 3) {
-		std::cout<<"HERE! run_precompiled_contract ripemd160"<<std::endl;
 		return run_precompiled_contract_ripemd160();
 	} else if(addr.bytes[18] == 0 && addr.bytes[19] == 4) {
-		std::cout<<"HERE! run_precompiled_contract echo"<<std::endl;
 		return run_precompiled_contract_echo();
 	} else if(addr.bytes[18] == SEP_CONTRACT_ADDR_BYTE_18 && addr.bytes[19] == SEP101_CONTRACT_ADDR_BYTE_19) {
 		return run_precompiled_contract_sep101();
@@ -723,7 +720,7 @@ evmc_result evmc_host_context::run_precompiled_contract_sep101() {
 	}
 	uint32_t selector = get_selector(msg.input_data);
 	uint256 key_len_256 = beptr_to_u256(msg.input_data + 4 + 64); // +64 to skip the two offset pointers
-	if(key_len_256 ==0 && key_len_256 > MAX_KEY_SIZE) {
+	if(key_len_256 == 0 || key_len_256 > MAX_KEY_SIZE) {
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	size_t key_len = size_t(key_len_256);
@@ -732,7 +729,7 @@ evmc_result evmc_host_context::run_precompiled_contract_sep101() {
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	evmc_bytes32 key_hash;
-	sha256(msg.input_data + 4 + 64, key_len, key_hash.bytes);
+	sha256(msg.input_data + 4 + 64/*two offsets*/ + 32/*length word*/, key_len, key_hash.bytes);
 	if(selector == SELECTOR_SEP101_GET) {
 		const bytes& bz = txctrl->get_value(msg.sender, key_hash);
 		int64_t gas = bz.size() * SEP101_GET_GAS_PER_BYTE;
@@ -791,7 +788,7 @@ static inline evmc_result evmc_result_from_str(const std::string& str, uint64_t 
 		.gas_left=int64_t(gas),
 		.release = evmc_free_result_memory,
 		.output_data=buffer,
-		.output_size=64};
+		.output_size=96};
 }
 
 static inline evmc_result evmc_result_from_int(int64_t value, uint64_t gas) {
@@ -942,9 +939,6 @@ evmc_result evmc_host_context::sep206_transferFrom() {
 }
 
 evmc_result evmc_host_context::run_precompiled_contract_sep206() {
-	if(msg.depth == 0) { // zero-depth-call is forbidden (not accessible from EOA)
-		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
-	}
 	if(msg.input_size < 4) {
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
