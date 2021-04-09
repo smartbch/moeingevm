@@ -350,31 +350,41 @@ void evmc_host_context::check_eip158() {
 	}
 }
 
-evmc_result evmc_host_context::call() {
-	//std::cerr<<"$msg.gas "<<msg.gas<<std::endl;
-	const account_info& acc = txctrl->get_account(msg.destination);
-	bool zero_value = is_zero_bytes32(&msg.value);
-	bool call_precompiled = is_precompiled(msg.destination);
-	size_t snapshot = txctrl->snapshot();
-	load_code(msg.destination);
-	bool is_empty = (acc.nonce == 0 && acc.balance == uint256(0) && this->code->size() == 0);
+static inline void transfer(tx_control* txctrl, const evmc_address& sender, const evmc_address& destination, const evmc_uint256be& value, bool* is_nop) {
+	const account_info& acc = txctrl->get_account(destination);
+	bool zero_value = is_zero_bytes32(&value);
+	bool call_precompiled = is_precompiled(destination);
+	bool is_empty = (acc.nonce == 0 && acc.balance == uint256(0) && 
+		txctrl->get_bytecode_entry(destination).bytecode.size() == 0);
 	if(acc.is_null() /*&& !call_precompiled*/) {
 		if(zero_value && !call_precompiled) {
-			return evmc_result {.status_code=EVMC_SUCCESS, .gas_left=msg.gas};
+			*is_nop = true;
+			return;
 		}
-		txctrl->new_account(msg.destination);
-		//std::cerr<<"$msg.gas after create "<<msg.gas<<std::endl;
+		txctrl->new_account(destination);
 	}
-	//std::cerr<<"try eip158 "<<is_empty<<" "<<zero_value<<" "<<to_hex(msg.destination)<<std::endl;
+	//std::cerr<<"try eip158 "<<is_empty<<" "<<zero_value<<" "<<to_hex(destination)<<std::endl;
 	if(is_empty && zero_value) { //eip158
-		txctrl->selfdestruct(msg.destination);
+		txctrl->selfdestruct(destination);
 	}
-	//std::cerr<<"Sender "<<to_hex(msg.sender)<<" Dst "<<to_hex(msg.destination)<<std::endl;
+	//std::cerr<<"Sender "<<to_hex(sender)<<" Dst "<<to_hex(destination)<<std::endl;
 	if(!zero_value /*&& !call_precompiled*/) {
-		txctrl->transfer(msg.sender, msg.destination, u256be_to_u256(msg.value));
+		txctrl->transfer(sender, destination, u256be_to_u256(value));
+	}
+	*is_nop = false;
+}
+
+evmc_result evmc_host_context::call() {
+	//std::cerr<<"$msg.gas "<<msg.gas<<std::endl;
+	size_t snapshot = txctrl->snapshot();
+	load_code(msg.destination);
+	bool is_nop;
+	transfer(txctrl, msg.sender, msg.destination, msg.value, &is_nop);
+	if(is_nop) {
+		return evmc_result {.status_code=EVMC_SUCCESS, .gas_left=msg.gas};
 	}
 	evmc_result result;
-	if(call_precompiled) {
+	if(is_precompiled(msg.destination)) {
 		result = run_precompiled_contract(msg.destination);
 		if(result.status_code != EVMC_SUCCESS) {
 			txctrl->revert_to_snapshot(snapshot);
@@ -713,19 +723,23 @@ inline uint32_t get_selector(const uint8_t* data) { //selector is big-endian byt
 
 evmc_result evmc_host_context::run_precompiled_contract_sep101() {
 	if(msg.depth == 0) { // zero-depth-call is forbidden (not accessible from EOA)
+		std::cout<<" Fail 0 "<<std::endl;
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	if(msg.input_size < 4 || msg.input_size > 4 + 32*4 + MAX_KEY_SIZE + MAX_VALUE_SIZE) {
+		std::cout<<" Fail 1 "<<std::endl;
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	uint32_t selector = get_selector(msg.input_data);
 	uint256 key_len_256 = beptr_to_u256(msg.input_data + 4 + 64); // +64 to skip the two offset pointers
 	if(key_len_256 == 0 || key_len_256 > MAX_KEY_SIZE) {
+		std::cout<<" Fail 2 "<<std::endl;
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	size_t key_len = size_t(key_len_256);
 	size_t key_words = (key_len+31)/32;
 	if(msg.input_size < 4 + 32*4 + key_words*32) {
+		std::cout<<" Fail 3 "<<std::endl;
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	evmc_bytes32 key_hash;
@@ -892,10 +906,11 @@ evmc_result evmc_host_context::sep206_approve(bool new_value, bool increase) {
 //    function transfer(address to, uint value) external returns (bool);
 evmc_result evmc_host_context::sep206_transfer() {
 	if(msg.input_size != 4 + 64) {
+		std::cout<<" Fail A "<<std::endl;
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
-	evmc_address target;
-	memcpy(target.bytes, msg.input_data + 4 + 12, 20);
+	evmc_address destination;
+	memcpy(destination.bytes, msg.input_data + 4 + 12, 20);
 	evmc_uint256be amount_be;
 	memcpy(amount_be.bytes, msg.input_data + 4 + 32, 32);
 	uint256 amount = u256be_to_u256(amount_be);
@@ -904,7 +919,8 @@ evmc_result evmc_host_context::sep206_transfer() {
 	if(balance < amount) {
 		return evmc_result{.status_code=EVMC_BALANCE_NOT_ENOUGH};
 	}
-	txctrl->transfer(msg.sender, target, amount);
+	bool is_nop;
+	transfer(txctrl, msg.sender, destination, amount_be, &is_nop);
 	return evmc_result_from_bool(true, msg.gas);
 }
 
@@ -913,9 +929,9 @@ evmc_result evmc_host_context::sep206_transferFrom() {
 	if(msg.input_size != 4 + 96) {
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
-	evmc_address source, target;
+	evmc_address source, destination;
 	memcpy(source.bytes, msg.input_data + 4 + 12, 20);
-	memcpy(target.bytes, msg.input_data + 4 + 32 + 12, 20);
+	memcpy(destination.bytes, msg.input_data + 4 + 32 + 12, 20);
 	evmc_uint256be amount_be;
 	memcpy(amount_be.bytes, msg.input_data + 4 + 32 + 32, 32);
 	uint256 amount = u256be_to_u256(amount_be);
@@ -926,12 +942,13 @@ evmc_result evmc_host_context::sep206_transferFrom() {
 	}
 	evmc_bytes32 key;
 	sha256(msg.input_data + 4, 64, key.bytes);
-	evmc_bytes32 allowance = get_storage(msg.destination, key);
+	evmc_bytes32 allowance = get_storage(source, key);
 	uint256 allowance_value = beptr_to_u256(allowance.bytes);
 	if(allowance_value < amount) {
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
-	txctrl->transfer(msg.sender, target, amount);
+	bool is_nop;
+	transfer(txctrl, source, destination, amount_be, &is_nop);
 	allowance_value -= amount;
 	u256_to_beptr(allowance_value, allowance.bytes);
 	set_storage(msg.destination, key, allowance);

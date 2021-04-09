@@ -56,6 +56,11 @@ evmc_address create_contract_addr(const evmc_address& creater, uint64_t nonce);
 
 evmc_address create2_contract_addr(const evmc_address& creater, const evmc_bytes32& salt, const evmc_bytes32& codehash);
 
+static bool is_zero_bytes32(const evmc_bytes32* bytes32) {
+	auto ptr = reinterpret_cast<const uint64_t*>(bytes32);
+	return (ptr[0]|ptr[1]|ptr[2]|ptr[3]) == 0;
+}
+
 // evmc_host_context is an incomplete struct defined in evmc.h, here we make it complete.
 // evmone uses this struct to get underlying service
 struct evmc_host_context {
@@ -68,11 +73,6 @@ private:
 public:
 	evmc_host_context(tx_control* tc, evmc_message m, small_buffer* b):
 		txctrl(tc), msg(m), empty_code(), smallbuf(b) {}
-
-	static bool is_zero_bytes32(const evmc_bytes32* bytes32) {
-		auto ptr = reinterpret_cast<const uint64_t*>(bytes32);
-		return (ptr[0]|ptr[1]|ptr[2]|ptr[3]) == 0;
-	}
 
 	bool account_exists(const evmc_address& addr) {
 		const account_info& info = txctrl->get_account(addr);
