@@ -458,12 +458,17 @@ void tx_control::selfdestruct(const evmc_address& addr) {
 // for SSTORE's gas&refund calculation, we must return correct evmc_storage_status according to EIP-2200
 evmc_storage_status tx_control::set_value(const evmc_address& addr, const evmc_bytes32& key, bytes_info raw_value) {
 	const account_info& info = cstate.get_account(addr);
+	return set_value(info.sequence, key, raw_value);
+}
+
+evmc_storage_status tx_control::set_value(uint64_t sequence, const evmc_bytes32& key, bytes_info raw_value) {
+	std::cout<<"here set_value "<<sequence<<std::endl;
 	journal_entry e {.type=VALUE_CHG};
 	e.value_change.key = key;
-	e.value_change.sequence = info.sequence;
-	const bytes& new_value = cstate.set_value(info.sequence, key, raw_value, &e.prev_value);
+	e.value_change.sequence = sequence;
+	const bytes& new_value = cstate.set_value(sequence, key, raw_value, &e.prev_value);
 	journal.push_back(e);
-	const bytes& origin = cstate.get_origin_value(info.sequence, key);
+	const bytes& origin = cstate.get_origin_value(sequence, key);
 	//If current value equals new value (this is a no-op), SLOAD_GAS is deducted.
 	if(e.prev_value == new_value) {
 		return EVMC_STORAGE_UNCHANGED;

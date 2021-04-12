@@ -84,9 +84,16 @@ public:
 		}
 		return true;
 	}
-	evmc_bytes32 get_storage(const evmc_address& addr, const evmc_bytes32& key) {
+	evmc_bytes32 get_storage(const evmc_address& addr, const evmc_bytes32& key, bool is_sep206=false) {
 		evmc_bytes32 result;
-		const bytes& bz = txctrl->get_value(addr, key);
+		if(is_sep206) {
+			std::cout<<" 11111111 "<<SEP206_SEQUENCE<<std::endl;
+		} else {
+			std::cout<<" 2222222"<<std::endl;
+		}
+		const bytes& bz = is_sep206 ? txctrl->get_value(SEP206_SEQUENCE, key) :
+			                      txctrl->get_value(addr, key);
+		std::cout<<" size"<<bz.size()<<std::endl;
 		if(bz.size() == 0) { // if the underlying KV pair does not exist, return all zero
 			return ZERO_BYTES32;
 		}
@@ -94,10 +101,14 @@ public:
 		memcpy(&result.bytes[0], bz.data(), 32);
 		return result;
 	}
-	evmc_storage_status set_storage(const evmc_address& addr, const evmc_bytes32& key, const evmc_bytes32& value) {
+	evmc_storage_status set_storage(const evmc_address& addr, const evmc_bytes32& key, const evmc_bytes32& value, bool is_sep206=false) {
 		// if the value is zero, set zero-length value to tx_control, which will later be taken as deletion
 		size_t size = is_zero_bytes32(&value)? 0 : 32;
-		return txctrl->set_value(addr, key, bytes_info{.data=&value.bytes[0], .size=size});
+		if(is_sep206) {
+			return txctrl->set_value(SEP206_SEQUENCE, key, bytes_info{.data=&value.bytes[0], .size=size});
+		} else {
+			return txctrl->set_value(addr, key, bytes_info{.data=&value.bytes[0], .size=size});
+		}
 	}
 	evmc_uint256be get_balance(const evmc_address& addr) {
 		return u256_to_u256be(get_balance_as_uint256(addr));
