@@ -882,8 +882,12 @@ evmc_result evmc_host_context::sep206_allowance() {
 	evmc_bytes32 key;
 	sha256(msg.input_data + 4, 64, key.bytes);
 	allowance_entry entry = get_storage_sep206(key);
+	assert(memcmp(entry.bytes + 32, ZERO_BYTES32.bytes, 20)==0 ||
+	       memcmp(entry.bytes + 32, msg.input_data + 4 + 12, 20)==0);
+	assert(memcmp(entry.bytes + 32 + 20, ZERO_BYTES32.bytes, 20)==0 ||
+	       memcmp(entry.bytes + 32 + 20, msg.input_data + 4 + 12 + 32, 20)==0);
 	uint8_t* buffer = (uint8_t*)malloc(32);
-	memcpy(buffer, entry.bytes + 40, 32);
+	memcpy(buffer, entry.bytes, 32);
 	return evmc_result{
 		.status_code=EVMC_SUCCESS,
 		.gas_left=int64_t(msg.gas),
@@ -908,15 +912,16 @@ evmc_result evmc_host_context::sep206_approve(bool new_value, bool increase) {
 	sha256(owner_and_spender, 64, key.bytes);
 	std::cout<<" approve allowance key "<<to_hex(key)<<" "<<to_hex(msg.sender)<<" "<<to_hex(spender)<<std::endl;
 	allowance_entry entry; 
-	memcpy(entry.bytes, msg.sender.bytes, 20);
-	memcpy(entry.bytes + 20, spender_offset, 20);
-	memcpy(entry.bytes + 40, msg.input_data + 4 + 32, 32);
+	memcpy(entry.bytes, msg.input_data + 4 + 32, 32);
+	memcpy(entry.bytes + 32, msg.sender.bytes, 20);
+	memcpy(entry.bytes + 32 + 20, spender_offset, 20);
 	if(new_value) {
 		set_storage_sep206(key, entry);
 	} else {
 		allowance_entry old_entry = get_storage_sep206(key);
-		uint256 allowance_value = beptr_to_u256(old_entry.bytes + 40);
-		uint256 delta = beptr_to_u256(entry.bytes + 40);
+		assert(memcmp(old_entry.bytes + 32, entry.bytes + 32, 40)==0);
+		uint256 allowance_value = beptr_to_u256(old_entry.bytes);
+		uint256 delta = beptr_to_u256(entry.bytes);
 		if(increase) {
 			allowance_value += delta;
 			if(allowance_value < delta) { //overflow
@@ -927,7 +932,7 @@ evmc_result evmc_host_context::sep206_approve(bool new_value, bool increase) {
 		} else {
 			allowance_value = 0;
 		}
-		u256_to_beptr(allowance_value, entry.bytes + 40);
+		u256_to_beptr(allowance_value, entry.bytes);
 		set_storage_sep206(key, entry);
 		evmc_bytes32 topics[3];
 		memcpy(topics[0].bytes, ApprovalEvent.bytes, 32);
@@ -992,7 +997,9 @@ evmc_result evmc_host_context::sep206_transferFrom() {
 	sha256(owner_and_spender, 64, key.bytes);
 	std::cout<<" allowance key "<<to_hex(key)<<" "<<to_hex(source)<<" "<<to_hex(msg.sender)<<std::endl;
 	allowance_entry entry = get_storage_sep206(key);
-	uint256 allowance_value = beptr_to_u256(entry.bytes + 40);
+	assert(memcmp(entry.bytes + 32, source.bytes, 20)==0);
+	assert(memcmp(entry.bytes + 32 + 20, msg.sender.bytes, 20)==0);
+	uint256 allowance_value = beptr_to_u256(entry.bytes);
 	if(allowance_value < amount) {
 		std::cout<<" Fail 2 "<<int64_t(allowance_value)<<" "<<int64_t(amount)<<std::endl;
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
@@ -1006,7 +1013,7 @@ evmc_result evmc_host_context::sep206_transferFrom() {
 		memset(topics[2].bytes, 0, 16); memcpy(topics[2].bytes + 12, destination.bytes, 20);
 		txctrl->add_log(msg.destination, amount_be.bytes, 32, topics, 3);
 		allowance_value -= amount;
-		u256_to_beptr(allowance_value, entry.bytes + 40);
+		u256_to_beptr(allowance_value, entry.bytes);
 		set_storage_sep206(key, entry);
 	}
 	return evmc_result_from_bool(true, msg.gas);

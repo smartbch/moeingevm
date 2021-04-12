@@ -60,7 +60,7 @@ static bool is_zero_bytes32(const evmc_bytes32* bytes32) {
 	return (ptr[0]|ptr[1]|ptr[2]|ptr[3]) == 0;
 }
 
-const int ALLOWANCE_ENTRY_SIZE = 20+20+32;
+const int ALLOWANCE_ENTRY_SIZE = 32+20+20;
 struct allowance_entry {
 	uint8_t bytes[ALLOWANCE_ENTRY_SIZE];
 };
