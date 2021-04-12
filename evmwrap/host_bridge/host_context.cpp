@@ -786,6 +786,9 @@ evmc_result evmc_host_context::run_precompiled_contract_sep101() {
 			.output_size=word_count*32};
 	}
 	std::cout<<" SELECTOR_SEP101_SET "<<std::endl;
+	if((msg.flags & EVMC_STATIC) != 0) {
+		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
+	}
 	const uint8_t* value_ptr = msg.input_data + 4 + 3*32 + key_words*32;
 	uint256 value_len_256 = beptr_to_u256(value_ptr);
 	if(value_len_256 > MAX_VALUE_SIZE) {
@@ -878,10 +881,9 @@ evmc_result evmc_host_context::sep206_allowance() {
 	}
 	evmc_bytes32 key;
 	sha256(msg.input_data + 4, 64, key.bytes);
-	evmc_bytes32 allowance = get_storage(msg.destination, key, true);
-	std::cout<<" return allowance "<<to_hex(allowance)<<std::endl;
+	allowance_entry entry = get_storage_sep206(key);
 	uint8_t* buffer = (uint8_t*)malloc(32);
-	memcpy(buffer, allowance.bytes, 32);
+	memcpy(buffer, entry.bytes + 40, 32);
 	return evmc_result{
 		.status_code=EVMC_SUCCESS,
 		.gas_left=int64_t(msg.gas),
@@ -905,15 +907,16 @@ evmc_result evmc_host_context::sep206_approve(bool new_value, bool increase) {
 	evmc_bytes32 key;
 	sha256(owner_and_spender, 64, key.bytes);
 	std::cout<<" approve allowance key "<<to_hex(key)<<" "<<to_hex(msg.sender)<<" "<<to_hex(spender)<<std::endl;
-	evmc_bytes32 value;
-	memcpy(value.bytes, msg.input_data + 4 + 32, 32);
+	allowance_entry entry; 
+	memcpy(entry.bytes, msg.sender.bytes, 20);
+	memcpy(entry.bytes + 20, spender_offset, 20);
+	memcpy(entry.bytes + 40, msg.input_data + 4 + 32, 32);
 	if(new_value) {
-		std::cout<<" new allowance "<<to_hex(value)<<std::endl;
-		set_storage(msg.destination, key, value, true);
+		set_storage_sep206(key, entry);
 	} else {
-		evmc_bytes32 allowance = get_storage(msg.destination, key, true);
-		uint256 allowance_value = beptr_to_u256(allowance.bytes);
-		uint256 delta = beptr_to_u256(value.bytes);
+		allowance_entry old_entry = get_storage_sep206(key);
+		uint256 allowance_value = beptr_to_u256(old_entry.bytes + 40);
+		uint256 delta = beptr_to_u256(entry.bytes + 40);
 		if(increase) {
 			allowance_value += delta;
 			if(allowance_value < delta) { //overflow
@@ -924,14 +927,13 @@ evmc_result evmc_host_context::sep206_approve(bool new_value, bool increase) {
 		} else {
 			allowance_value = 0;
 		}
-		std::cout<<" changed allowance "<<to_hex(allowance)<<std::endl;
-		u256_to_beptr(allowance_value, allowance.bytes);
-		set_storage(msg.destination, key, allowance, true);
+		u256_to_beptr(allowance_value, entry.bytes + 40);
+		set_storage_sep206(key, entry);
 		evmc_bytes32 topics[3];
 		memcpy(topics[0].bytes, ApprovalEvent.bytes, 32);
 		memset(topics[1].bytes, 0, 16); memcpy(topics[1].bytes + 12, msg.sender.bytes, 20);
 		memset(topics[2].bytes, 0, 16); memcpy(topics[2].bytes + 12, spender_offset, 20);
-		txctrl->add_log(msg.destination, allowance.bytes, 32, topics, 3);
+		txctrl->add_log(msg.destination, entry.bytes + 40, 32, topics, 3);
 	}
 	return evmc_result_from_bool(true, msg.gas);
 }
@@ -989,8 +991,8 @@ evmc_result evmc_host_context::sep206_transferFrom() {
 	evmc_bytes32 key;
 	sha256(owner_and_spender, 64, key.bytes);
 	std::cout<<" allowance key "<<to_hex(key)<<" "<<to_hex(source)<<" "<<to_hex(msg.sender)<<std::endl;
-	evmc_bytes32 allowance = get_storage(msg.destination, key, true);
-	uint256 allowance_value = beptr_to_u256(allowance.bytes);
+	allowance_entry entry = get_storage_sep206(key);
+	uint256 allowance_value = beptr_to_u256(entry.bytes + 40);
 	if(allowance_value < amount) {
 		std::cout<<" Fail 2 "<<int64_t(allowance_value)<<" "<<int64_t(amount)<<std::endl;
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
@@ -1004,8 +1006,8 @@ evmc_result evmc_host_context::sep206_transferFrom() {
 		memset(topics[2].bytes, 0, 16); memcpy(topics[2].bytes + 12, destination.bytes, 20);
 		txctrl->add_log(msg.destination, amount_be.bytes, 32, topics, 3);
 		allowance_value -= amount;
-		u256_to_beptr(allowance_value, allowance.bytes);
-		set_storage(msg.destination, key, allowance, true);
+		u256_to_beptr(allowance_value, entry.bytes + 40);
+		set_storage_sep206(key, entry);
 	}
 	return evmc_result_from_bool(true, msg.gas);
 }

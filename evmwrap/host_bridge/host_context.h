@@ -60,6 +60,11 @@ static bool is_zero_bytes32(const evmc_bytes32* bytes32) {
 	return (ptr[0]|ptr[1]|ptr[2]|ptr[3]) == 0;
 }
 
+const int ALLOWANCE_ENTRY_SIZE = 20+20+32;
+struct allowance_entry {
+	uint8_t bytes[ALLOWANCE_ENTRY_SIZE];
+};
+
 // evmc_host_context is an incomplete struct defined in evmc.h, here we make it complete.
 // evmone uses this struct to get underlying service
 struct evmc_host_context {
@@ -84,15 +89,9 @@ public:
 		}
 		return true;
 	}
-	evmc_bytes32 get_storage(const evmc_address& addr, const evmc_bytes32& key, bool is_sep206=false) {
+	evmc_bytes32 get_storage(const evmc_address& addr, const evmc_bytes32& key) {
 		evmc_bytes32 result;
-		if(is_sep206) {
-			std::cout<<" 11111111 "<<SEP206_SEQUENCE<<std::endl;
-		} else {
-			std::cout<<" 2222222"<<std::endl;
-		}
-		const bytes& bz = is_sep206 ? txctrl->get_value(SEP206_SEQUENCE, key) :
-			                      txctrl->get_value(addr, key);
+		const bytes& bz = txctrl->get_value(addr, key);
 		std::cout<<" size"<<bz.size()<<std::endl;
 		if(bz.size() == 0) { // if the underlying KV pair does not exist, return all zero
 			return ZERO_BYTES32;
@@ -101,14 +100,23 @@ public:
 		memcpy(&result.bytes[0], bz.data(), 32);
 		return result;
 	}
-	evmc_storage_status set_storage(const evmc_address& addr, const evmc_bytes32& key, const evmc_bytes32& value, bool is_sep206=false) {
+	allowance_entry get_storage_sep206(const evmc_bytes32& key) {
+		allowance_entry result={};
+		const bytes& bz = txctrl->get_value(SEP206_SEQUENCE, key);
+		if(bz.size() == 0) { // if the underlying KV pair does not exist, return all zero
+			return result;
+		}
+		assert(bz.size() >= ALLOWANCE_ENTRY_SIZE);
+		memcpy(result.bytes, bz.data(), ALLOWANCE_ENTRY_SIZE);
+		return result;
+	}
+	evmc_storage_status set_storage(const evmc_address& addr, const evmc_bytes32& key, const evmc_bytes32& value) {
 		// if the value is zero, set zero-length value to tx_control, which will later be taken as deletion
 		size_t size = is_zero_bytes32(&value)? 0 : 32;
-		if(is_sep206) {
-			return txctrl->set_value(SEP206_SEQUENCE, key, bytes_info{.data=&value.bytes[0], .size=size});
-		} else {
-			return txctrl->set_value(addr, key, bytes_info{.data=&value.bytes[0], .size=size});
-		}
+		return txctrl->set_value(addr, key, bytes_info{.data=&value.bytes[0], .size=size});
+	}
+	void set_storage_sep206(const evmc_bytes32& key, const allowance_entry& value) {
+		txctrl->set_value(SEP206_SEQUENCE, key, bytes_info{.data=value.bytes, .size=ALLOWANCE_ENTRY_SIZE});
 	}
 	evmc_uint256be get_balance(const evmc_address& addr) {
 		return u256_to_u256be(get_balance_as_uint256(addr));
