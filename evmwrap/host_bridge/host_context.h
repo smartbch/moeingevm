@@ -43,9 +43,8 @@ const uint32_t SEP206_DECREASEALLOWANCE_GAS = 0;
 const uint32_t SEP206_TRANSFER_GAS = 0;
 const uint32_t SEP206_TRANSFERFROM_GAS = 0;
 
-const uint8_t SEP_CONTRACT_ADDR_BYTE_18 = 0x27;
-const uint8_t SEP101_CONTRACT_ADDR_BYTE_19 = 0x12;
-const uint8_t SEP206_CONTRACT_ADDR_BYTE_19 = 0x11;
+const int64_t SEP101_CONTRACT_ID = 0x2712;
+const int64_t SEP206_CONTRACT_ID = 0x2711;
 
 
 const bool SELFDESTRUCT_BENEFICIARY_CANNOT_BE_PRECOMPILED = false;
@@ -129,7 +128,7 @@ public:
 	}
 
 	void load_code(const evmc_address& addr);
-	evmc_result run_precompiled_contract(const evmc_address& addr);
+	evmc_result run_precompiled_contract(const evmc_address& addr, int64_t id);
 	evmc_result run_precompiled_contract_sha256();
 	evmc_result run_precompiled_contract_ripemd160();
 	evmc_result run_precompiled_contract_echo();
