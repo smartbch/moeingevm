@@ -375,6 +375,45 @@ bc221a1460375780636299a6ef146053575b600080fd5b603d607e565b604051
 	require.True(t, bytes.Equal(contractAddr[:], e.committedTxs[0].ContractAddress[:]))
 }
 
+func TestRandomPrepare(t *testing.T) {
+	trunk, root := prepareTruck()
+	defer closeTestCtx(root)
+	e := NewEbpTxExec(5, 5, 5, 10, &testcase.DumbSigner{})
+	e.SetContext(prepareCtx(trunk))
+	txs := prepareAccAndTx(e)
+	e.CollectTx(txs[0])
+	tx0, _ := gethtypes.NewTransaction(0, to1, big.NewInt(200), 100000, big.NewInt(1), nil).WithSignature(e.signer, from1.Bytes())
+	tx1, _ := gethtypes.NewTransaction(1, to1, big.NewInt(200), 100000, big.NewInt(1), nil).WithSignature(e.signer, from1.Bytes())
+	tx2, _ := gethtypes.NewTransaction(2, to1, big.NewInt(400), 100000, big.NewInt(1), nil).WithSignature(e.signer, from1.Bytes())
+	tx3, _ := gethtypes.NewTransaction(3, to1, big.NewInt(400), 100000, big.NewInt(1), nil).WithSignature(e.signer, from1.Bytes())
+	tx4, _ := gethtypes.NewTransaction(4, to1, big.NewInt(400), 100000, big.NewInt(1), nil).WithSignature(e.signer, from1.Bytes())
+	tx5, _ := gethtypes.NewTransaction(5, to1, big.NewInt(400), 100000, big.NewInt(1), nil).WithSignature(e.signer, from1.Bytes())
+	tx6, _ := gethtypes.NewTransaction(6, to1, big.NewInt(400), 100000, big.NewInt(1), nil).WithSignature(e.signer, from1.Bytes())
+	tx7, _ := gethtypes.NewTransaction(7, to1, big.NewInt(400), 100000, big.NewInt(1), nil).WithSignature(e.signer, from1.Bytes())
+	tx8, _ := gethtypes.NewTransaction(8, to1, big.NewInt(400), 100000, big.NewInt(1), nil).WithSignature(e.signer, from1.Bytes())
+	tx9, _ := gethtypes.NewTransaction(9, to1, big.NewInt(400), 100000, big.NewInt(1), nil).WithSignature(e.signer, from1.Bytes())
+	tx10, _ := gethtypes.NewTransaction(10, to1, big.NewInt(400), 100000, big.NewInt(1), nil).WithSignature(e.signer, from1.Bytes())
+	tx11, _ := gethtypes.NewTransaction(11, to1, big.NewInt(400), 100000, big.NewInt(1), nil).WithSignature(e.signer, from1.Bytes())
+
+	for i := 0; i < 2; i++ {
+		e.SetContext(prepareCtx(trunk))
+		e.CollectTx(tx0)
+		e.CollectTx(tx1)
+		e.CollectTx(tx2)
+		e.CollectTx(tx3)
+		e.CollectTx(tx4)
+		e.CollectTx(tx5)
+		e.CollectTx(tx6)
+		e.CollectTx(tx7)
+		e.CollectTx(tx8)
+		e.CollectTx(tx9)
+		e.CollectTx(tx10)
+		e.CollectTx(tx11)
+		e.Prepare()
+		require.Equal(t, 12*i+12, e.StandbyQLen())
+	}
+}
+
 func TestConsistentForDebug(t *testing.T) {
 	trunk, root := prepareTruck()
 	defer closeTestCtx(root)
