@@ -17,6 +17,10 @@ import (
 	"github.com/smartbch/moeingevm/utils"
 )
 
+var (
+	MaxTxGasLimit = 1000_0000
+)
+
 var _ TxExecutor = (*txEngine)(nil)
 
 type TxRange struct {
@@ -85,12 +89,12 @@ func (exec *txEngine) SetContext(ctx *types.Context) {
 }
 
 // Check transactions' signatures and insert the valid ones into standby queue
-func (exec *txEngine) Prepare(reorderSeed int64) {
+func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice uint64) {
 	if len(exec.txList) == 0 {
 		exec.cleanCtx.Close(false)
 		return
 	}
-	infoList, ctxAA := exec.parallelReadAccounts()
+	infoList, ctxAA := exec.parallelReadAccounts(minGasPrice)
 	addr2idx := make(map[common.Address]int)      // map address to ctxAA's index
 	for idx, entry := range ctxAA {
 		for _, addr := range entry.accounts {
@@ -150,7 +154,7 @@ func (exec *txEngine) Prepare(reorderSeed int64) {
 }
 
 // Read accounts' information in parallel, while checking accouts' existence and signatures' validity
-func (exec *txEngine) parallelReadAccounts() (infoList []*preparedInfo, ctxAA []*ctxAndAccounts) {
+func (exec *txEngine) parallelReadAccounts(minGasPrice uint64) (infoList []preparedInfo, ctxAA []ctxAndAccounts) {
 	//for each tx, we fetch some info for it
 	infoList = make([]*preparedInfo, len(exec.txList))
 	//the ctx and accounts that a worker works at
@@ -174,14 +178,28 @@ func (exec *txEngine) parallelReadAccounts() (infoList []*preparedInfo, ctxAA []
 			infoList[myIdx] = &preparedInfo{}
 			// we need some computation to get the sender's address
 			sender, err := exec.signer.Sender(tx)
+			//set txToRun first
+			txToRun := &types.TxToRun{}
+			txToRun.FromGethTx(tx, sender, exec.cleanCtx.Height)
+			infoList[myIdx].tx = txToRun
 			if err != nil {
 				infoList[myIdx].valid = false
 				infoList[myIdx].statusStr = "invalid signature"
 				continue // skip invalid signature
 			}
-			txToRun := &types.TxToRun{}
-			txToRun.FromGethTx(tx, sender, exec.cleanCtx.Height)
-			// access disk to fetch the account's detail
+			//todo: check if overflow or not
+			gasPrice, _ := uint256.FromBig(tx.GasPrice())
+			if gasPrice.Cmp(uint256.NewInt().SetUint64(minGasPrice)) < 0 {
+				infoList[myIdx].valid = false
+				infoList[myIdx].statusStr = "invalid gas price"
+				continue // skip invalid tx gas price
+			}
+			if tx.Gas() > uint64(MaxTxGasLimit) {
+				infoList[myIdx].valid = false
+				infoList[myIdx].statusStr = "invalid gas limit"
+				continue // skip invalid tx gas limit
+			}
+      // access disk to fetch the account's detail
 			acc := ctxAA[workerId].ctx.GetAccount(sender)
 			infoList[myIdx].valid = acc != nil
 			if acc == nil {
@@ -558,8 +576,8 @@ func SubSystemAccBalance(ctx *types.Context, amount *uint256.Int) error {
 	return updateBalance(ctx, systemContractAddress, amount, false)
 }
 
-func TransferFromSystemAccToBlackHoleAcc(ctx *types.Context, amount *uint256.Int) error {
-	err := updateBalance(ctx, systemContractAddress, amount, false)
+func TransferFromSenderAccToBlackHoleAcc(ctx *types.Context, sender common.Address, amount *uint256.Int) error {
+	err := updateBalance(ctx, sender, amount, false)
 	if err != nil {
 		return err
 	}
