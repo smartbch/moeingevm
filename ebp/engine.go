@@ -15,6 +15,10 @@ import (
 	"github.com/smartbch/moeingevm/utils"
 )
 
+var (
+	MaxTxGasLimit = 1000_0000
+)
+
 var _ TxExecutor = (*txEngine)(nil)
 
 type TxRange struct {
@@ -82,12 +86,12 @@ func (exec *txEngine) SetContext(ctx *types.Context) {
 }
 
 // Check transactions' signatures and insert the valid ones into standby queue
-func (exec *txEngine) Prepare() {
+func (exec *txEngine) Prepare(minGasPrice uint64) {
 	if len(exec.txList) == 0 {
 		exec.cleanCtx.Close(false)
 		return
 	}
-	infoList, ctxAA := exec.parallelReadAccounts()
+	infoList, ctxAA := exec.parallelReadAccounts(minGasPrice)
 	addr2idx := make(map[common.Address]int)      // map address to ctxAA's index
 	addr2nonce := make(map[common.Address]uint64) // record each address's nonce
 	for idx, entry := range ctxAA {
@@ -139,7 +143,7 @@ func (exec *txEngine) Prepare() {
 }
 
 // Read accounts' information in parallel, while checking accouts' existence and signatures' validity
-func (exec *txEngine) parallelReadAccounts() (infoList []preparedInfo, ctxAA []ctxAndAccounts) {
+func (exec *txEngine) parallelReadAccounts(minGasPrice uint64) (infoList []preparedInfo, ctxAA []ctxAndAccounts) {
 	//for each tx, we fetch some info for it
 	infoList = make([]preparedInfo, len(exec.txList))
 	//the ctx and accounts that a worker works at
@@ -158,13 +162,27 @@ func (exec *txEngine) parallelReadAccounts() (infoList []preparedInfo, ctxAA []c
 			}
 			tx := exec.txList[myIdx]
 			sender, err := exec.signer.Sender(tx)
+			//set txToRun first
+			txToRun := &types.TxToRun{}
+			txToRun.FromGethTx(tx, sender, exec.cleanCtx.Height)
+			infoList[myIdx].tx = txToRun
 			if err != nil {
 				infoList[myIdx].valid = false
 				infoList[myIdx].statusStr = "invalid signature"
 				continue // skip invalid signature
 			}
-			txToRun := &types.TxToRun{}
-			txToRun.FromGethTx(tx, sender, exec.cleanCtx.Height)
+			//todo: check if overflow or not
+			gasPrice, _ := uint256.FromBig(tx.GasPrice())
+			if gasPrice.Cmp(uint256.NewInt().SetUint64(minGasPrice)) < 0 {
+				infoList[myIdx].valid = false
+				infoList[myIdx].statusStr = "invalid gas price"
+				continue // skip invalid tx gas price
+			}
+			if tx.Gas() > uint64(MaxTxGasLimit) {
+				infoList[myIdx].valid = false
+				infoList[myIdx].statusStr = "invalid gas limit"
+				continue // skip invalid tx gas limit
+			}
 			acc := ctxAA[workerId].ctx.GetAccount(sender)
 			infoList[myIdx].valid = acc != nil
 			if acc == nil {
@@ -173,7 +191,6 @@ func (exec *txEngine) parallelReadAccounts() (infoList []preparedInfo, ctxAA []c
 			}
 			ctxAA[workerId].accounts = append(ctxAA[workerId].accounts, sender)
 			ctxAA[workerId].nonces = append(ctxAA[workerId].nonces, acc.Nonce())
-			infoList[myIdx].tx = txToRun
 			infoList[myIdx].gasFee.Mul(uint256.NewInt().SetUint64(txToRun.Gas),
 				utils.U256FromSlice32(txToRun.GasPrice[:]))
 		}
