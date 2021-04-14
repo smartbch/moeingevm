@@ -39,8 +39,19 @@ inline evmc_uint256be u256_to_u256be(const uint256& u) {
 	return result;
 }
 
+inline void u256_to_beptr(const uint256& u, uint8_t* ptr) {
+	intx::uint256 v = intx::bswap(u);
+	memcpy(ptr, &v, 32);
+}
+
 inline uint256 u256be_to_u256(const evmc_uint256be& a) {
 	return intx::be::load<uint256, 32>(a.bytes);
+}
+
+inline uint256 beptr_to_u256(const uint8_t* ptr) {
+	evmc_uint256be a;
+	memcpy(a.bytes, ptr, 32);
+	return u256be_to_u256(a);
 }
 
 // Given 0 <= i <= 15, outputs its dex presentation
@@ -75,14 +86,17 @@ inline std::string to_hex(const bytes& bz) {
 
 extern evmc_bytes32 HASH_FOR_ZEROCODE; // keccak hash of a zero-length string
 
+const uint64_t EOA_SEQUENCE = uint64_t(-1);
+const uint64_t SEP206_SEQUENCE = uint64_t(2000);
+
 // basic information about an account, NOT including its bytecode
 struct account_info {
 	bool selfdestructed;
 	uint256 balance;
 	uint64_t nonce; // If not exists, nonce is uint64_t(-1)
-	uint64_t sequence; // For EOA, sequence is uint64_t(-1)
+	uint64_t sequence; // For EOA, sequence is uint64_t(-1), For SEP206, uint64_t(-2)
 	bool is_null() const {return nonce==uint64_t(-1);}
-	bool is_eoa() const {return sequence==uint64_t(-1);}
+	bool is_eoa() const {return sequence==EOA_SEQUENCE;}
 	bool is_empty() const {return nonce==0 && balance==uint256(0) && is_eoa();}
 };
 
@@ -387,10 +401,15 @@ public:
 		const account_info& info = cstate.get_account(addr);
 		return cstate.get_value(info.sequence, key);
 	}
+	const bytes& get_value(uint64_t sequence, const evmc_bytes32& key) {
+		std::cout<<"here get_value "<<sequence<<std::endl;
+		return cstate.get_value(sequence, key);
+	}
 	const bytecode_entry& get_bytecode_entry(const evmc_address& addr) {
 		return cstate.get_bytecode_entry(addr);
 	}
 	evmc_storage_status set_value(const evmc_address& addr, const evmc_bytes32& key, bytes_info value);
+	evmc_storage_status set_value(uint64_t sequence, const evmc_bytes32& key, bytes_info value);
 	void add_refund(uint64_t delta);
 	void sub_refund(uint64_t delta);
 
@@ -411,13 +430,6 @@ const uint64_t SSTORE_SET_GAS = 20000;
 const uint64_t SSTORE_RESET_GAS = 5000;
 const uint64_t SSTORE_CLEARS_SCHEDULE = 15000;
 const uint64_t SELFDESTRUCT_REFUND_GAS = 24000;
-
-const uint64_t SHA256_BASE_GAS = 60;
-const uint64_t SHA256_PER_WORD_GAS = 12;
-const uint64_t RIPEMD160_BASE_GAS = 600;
-const uint64_t RIPEMD160_PER_WORD_GAS = 120;
-const uint64_t IDENTITY_BASE_GAS = 15;
-const uint64_t IDENTITY_PER_WORD_GAS = 3;
 
 const uint64_t CREATE_DATA_GAS = 200;
 const uint64_t TX_GAS  = 21000; // Per transaction not creating a contract.

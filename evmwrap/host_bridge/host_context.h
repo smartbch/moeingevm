@@ -5,6 +5,47 @@
 
 const uint64_t MAX_UINT64 = ~uint64_t(0);
 const uint64_t MAX_CODE_SIZE = 24576; // 24k
+const uint64_t MAX_KEY_SIZE = 256;
+const uint64_t MAX_VALUE_SIZE = 24576; // 24k
+
+const uint32_t SELECTOR_SEP101_GET = 0xd6d7d525;
+const uint32_t SELECTOR_SEP101_SET = 0xa18c751e;
+const uint32_t SELECTOR_SEP206_NAME = 0x06fdde03;
+const uint32_t SELECTOR_SEP206_SYMBOL = 0x95d89b41;
+const uint32_t SELECTOR_SEP206_DECIMALS = 0x313ce567;
+const uint32_t SELECTOR_SEP206_TOTALSUPPLY = 0x18160ddd;
+const uint32_t SELECTOR_SEP206_BALANCEOF = 0x70a08231;
+const uint32_t SELECTOR_SEP206_ALLOWANCE = 0xdd62ed3e;
+const uint32_t SELECTOR_SEP206_APPROVE = 0x095ea7b3;
+const uint32_t SELECTOR_SEP206_INCREASEALLOWANCE = 0x39509351;
+const uint32_t SELECTOR_SEP206_DECREASEALLOWANCE = 0xa457c2d7;
+const uint32_t SELECTOR_SEP206_TRANSFER = 0xa9059cbb;
+const uint32_t SELECTOR_SEP206_TRANSFERFROM = 0x23b872dd;
+
+const uint64_t SHA256_BASE_GAS = 60;
+const uint64_t SHA256_PER_WORD_GAS = 12;
+const uint64_t RIPEMD160_BASE_GAS = 600;
+const uint64_t RIPEMD160_PER_WORD_GAS = 120;
+const uint64_t IDENTITY_BASE_GAS = 15;
+const uint64_t IDENTITY_PER_WORD_GAS = 3;
+const uint64_t SEP101_BASE_GAS = 60;
+const uint64_t SEP101_GET_GAS_PER_BYTE = 15;
+const uint64_t SEP101_SET_GAS_PER_BYTE = 15;
+const uint32_t SEP206_NAME_GAS = 0;
+const uint32_t SEP206_SYMBOL_GAS = 0;
+const uint32_t SEP206_DECIMALS_GAS = 0;
+const uint32_t SEP206_TOTALSUPPLY_GAS = 0;
+const uint32_t SEP206_BALANCEOF_GAS = 0;
+const uint32_t SEP206_ALLOWANCE_GAS = 0;
+const uint32_t SEP206_APPROVE_GAS = 0;
+const uint32_t SEP206_INCREASEALLOWANCE_GAS = 0;
+const uint32_t SEP206_DECREASEALLOWANCE_GAS = 0;
+const uint32_t SEP206_TRANSFER_GAS = 0;
+const uint32_t SEP206_TRANSFERFROM_GAS = 0;
+
+const int64_t SEP101_CONTRACT_ID = 0x2712;
+const int64_t SEP206_CONTRACT_ID = 0x2711;
+
 
 const bool SELFDESTRUCT_BENEFICIARY_CANNOT_BE_PRECOMPILED = false;
 
@@ -13,6 +54,16 @@ extern evmc_bytes32 ZERO_BYTES32;
 evmc_address create_contract_addr(const evmc_address& creater, uint64_t nonce);
 
 evmc_address create2_contract_addr(const evmc_address& creater, const evmc_bytes32& salt, const evmc_bytes32& codehash);
+
+static bool is_zero_bytes32(const evmc_bytes32* bytes32) {
+	auto ptr = reinterpret_cast<const uint64_t*>(bytes32);
+	return (ptr[0]|ptr[1]|ptr[2]|ptr[3]) == 0;
+}
+
+const int ALLOWANCE_ENTRY_SIZE = 32+20+20;
+struct allowance_entry {
+	uint8_t bytes[ALLOWANCE_ENTRY_SIZE];
+};
 
 // evmc_host_context is an incomplete struct defined in evmc.h, here we make it complete.
 // evmone uses this struct to get underlying service
@@ -26,11 +77,6 @@ private:
 public:
 	evmc_host_context(tx_control* tc, evmc_message m, small_buffer* b):
 		txctrl(tc), msg(m), empty_code(), smallbuf(b) {}
-
-	static bool is_zero_bytes32(const evmc_bytes32* bytes32) {
-		auto ptr = reinterpret_cast<const uint64_t*>(bytes32);
-		return (ptr[0]|ptr[1]|ptr[2]|ptr[3]) == 0;
-	}
 
 	bool account_exists(const evmc_address& addr) {
 		const account_info& info = txctrl->get_account(addr);
@@ -46,6 +92,7 @@ public:
 	evmc_bytes32 get_storage(const evmc_address& addr, const evmc_bytes32& key) {
 		evmc_bytes32 result;
 		const bytes& bz = txctrl->get_value(addr, key);
+		std::cout<<" size"<<bz.size()<<std::endl;
 		if(bz.size() == 0) { // if the underlying KV pair does not exist, return all zero
 			return ZERO_BYTES32;
 		}
@@ -53,10 +100,23 @@ public:
 		memcpy(&result.bytes[0], bz.data(), 32);
 		return result;
 	}
+	allowance_entry get_storage_sep206(const evmc_bytes32& key) {
+		allowance_entry result={};
+		const bytes& bz = txctrl->get_value(SEP206_SEQUENCE, key);
+		if(bz.size() == 0) { // if the underlying KV pair does not exist, return all zero
+			return result;
+		}
+		assert(bz.size() >= ALLOWANCE_ENTRY_SIZE);
+		memcpy(result.bytes, bz.data(), ALLOWANCE_ENTRY_SIZE);
+		return result;
+	}
 	evmc_storage_status set_storage(const evmc_address& addr, const evmc_bytes32& key, const evmc_bytes32& value) {
 		// if the value is zero, set zero-length value to tx_control, which will later be taken as deletion
 		size_t size = is_zero_bytes32(&value)? 0 : 32;
 		return txctrl->set_value(addr, key, bytes_info{.data=&value.bytes[0], .size=size});
+	}
+	void set_storage_sep206(const evmc_bytes32& key, const allowance_entry& value) {
+		txctrl->set_value(SEP206_SEQUENCE, key, bytes_info{.data=value.bytes, .size=ALLOWANCE_ENTRY_SIZE});
 	}
 	evmc_uint256be get_balance(const evmc_address& addr) {
 		return u256_to_u256be(get_balance_as_uint256(addr));
@@ -87,7 +147,17 @@ public:
 	}
 
 	void load_code(const evmc_address& addr);
-	evmc_result run_precompiled_contract(const evmc_address& addr);
+	evmc_result run_precompiled_contract(const evmc_address& addr, int64_t id);
+	evmc_result run_precompiled_contract_sha256();
+	evmc_result run_precompiled_contract_ripemd160();
+	evmc_result run_precompiled_contract_echo();
+	evmc_result run_precompiled_contract_sep101();
+	evmc_result run_precompiled_contract_sep206();
+	evmc_result sep206_balanceOf();
+	evmc_result sep206_allowance();
+	evmc_result sep206_approve(bool new_value, bool increase);
+	evmc_result sep206_transfer();
+	evmc_result sep206_transferFrom();
 	evmc_result call(const evmc_message& msg);
 	evmc_result call();
 	evmc_result run_vm(size_t snapshot);

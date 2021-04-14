@@ -11,7 +11,7 @@ type TxExecutor interface {
 	//step 1: for deliverTx, collect block txs in engine.txList
 	CollectTx(tx *gethtypes.Transaction)
 	//step 2: for commit, check sig, insert regular txs standbyTxQ
-	Prepare(minGasPrice uint64)
+	Prepare(reorderSeed int64, minGasPrice uint64)
 	//step 3: for postCommit, parallel execute tx in standbyTxQ
 	Execute(currBlock *types.BlockInfo)
 
