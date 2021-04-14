@@ -430,6 +430,13 @@ func toHex(bz []byte) string {
 	return hex.EncodeToString(bz)
 }
 
+
+var (
+	// record pending gas fee and refund
+	systemContractAddress = [20]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		byte('s'), byte('y'), byte('s'), byte('t'), byte('e'), byte('m')}
+)
+
 func PrintWorldState(fout io.Writer, state *WorldState) {
 	addrList := make([][20]byte, 0, len(state.Accounts))
 	for addr := range state.Accounts {
@@ -439,6 +446,9 @@ func PrintWorldState(fout io.Writer, state *WorldState) {
 		return bytes.Compare(addrList[i][:], addrList[j][:]) < 0
 	})
 	for _, addr := range addrList {
+		if addr == systemContractAddress {
+			continue
+		}
 		acc := state.Accounts[addr]
 		fmt.Fprintf(fout, " addr 0x%s\n", toHex(addr[:]))
 		fmt.Fprintf(fout, "  acc_nonce %d\n", acc.Nonce)
