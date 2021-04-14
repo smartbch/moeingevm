@@ -154,7 +154,7 @@ func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice uint64) {
 }
 
 // Read accounts' information in parallel, while checking accouts' existence and signatures' validity
-func (exec *txEngine) parallelReadAccounts(minGasPrice uint64) (infoList []preparedInfo, ctxAA []ctxAndAccounts) {
+func (exec *txEngine) parallelReadAccounts(minGasPrice uint64) (infoList []*preparedInfo, ctxAA []*ctxAndAccounts) {
 	//for each tx, we fetch some info for it
 	infoList = make([]*preparedInfo, len(exec.txList))
 	//the ctx and accounts that a worker works at
