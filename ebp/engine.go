@@ -362,10 +362,10 @@ func (exec *txEngine) setStandbyQueueRange(start, end uint64) {
 
 // Execute 'runnerNumber' transactions in parallel and commit the ones without any interdependency
 func (exec *txEngine) executeOneRound(txRange *TxRange, currBlock *types.BlockInfo) int {
-	standbyTxList := exec.loadStandbyTxs(txRange)
-	exec.runTxInParallel(standbyTxList, currBlock)
-	exec.checkTxDepsAndUptStandbyQ(txRange, standbyTxList)
-	return len(standbyTxList)
+	txBundle := exec.loadStandbyTxs(txRange)
+	exec.runTxInParallel(txBundle, currBlock)
+	exec.checkTxDepsAndUptStandbyQ(txRange, txBundle)
+	return len(txBundle)
 }
 
 // Load at most 'exec.runnerNumber' transactions from standby queue
@@ -399,7 +399,12 @@ func (exec *txEngine) runTxInParallel(txBundle []types.TxToRun, currBlock *types
 				Ctx: *exec.cleanCtx.WithRbtCopy(),
 				Tx:  &txBundle[myIdx],
 			}
-			runTx(int(myIdx), currBlock)
+			if myIdx > 0 && txBundle[myIdx-1].From == txBundle[myIdx].From {
+				// same from-address as previous transaction, cannot run
+				Runners[myIdx].Status = types.TX_NONCE_TOO_LARGE
+			} else {
+				runTx(int(myIdx), currBlock)
+			}
 		}
 	})
 }
@@ -407,9 +412,9 @@ func (exec *txEngine) runTxInParallel(txBundle []types.TxToRun, currBlock *types
 // Check interdependency of TXs using 'touchedSet'. The ones with dependency with former committed TXs cannot
 // be committed and should be inserted back into the standby queue.
 // A TX whose nonce is too small should also be inserted back into the standby queue.
-func (exec *txEngine) checkTxDepsAndUptStandbyQ(txRange *TxRange, standbyTxList []types.TxToRun) {
+func (exec *txEngine) checkTxDepsAndUptStandbyQ(txRange *TxRange, txBundle []types.TxToRun) {
 	touchedSet := make(map[uint64]struct{}, 1000)
-	for idx := range standbyTxList {
+	for idx := range txBundle {
 		canCommit := true
 		Runners[idx].Ctx.Rbt.ScanAllShortKeys(func(key [rabbit.KeySize]byte, dirty bool) (stop bool) {
 			k := binary.LittleEndian.Uint64(key[:])
@@ -434,7 +439,7 @@ func (exec *txEngine) checkTxDepsAndUptStandbyQ(txRange *TxRange, standbyTxList 
 	}
 
 	ctx := exec.cleanCtx.WithRbtCopy()
-	for idx, tx := range standbyTxList {
+	for idx, tx := range txBundle {
 		k := types.GetStandbyTxKey(txRange.start)
 		txRange.start++
 		ctx.Rbt.Delete(k) // remove it from the standby queue
