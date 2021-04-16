@@ -781,9 +781,9 @@ evmc_result evmc_host_context::run_precompiled_contract_sep101() {
 		return evmc_result{
 			.status_code=EVMC_SUCCESS,
 			.gas_left=int64_t(msg.gas-gas),
-			.release = evmc_free_result_memory,
 			.output_data=buffer,
-			.output_size=word_count*32};
+			.output_size=word_count*32,
+			.release = evmc_free_result_memory};
 	}
 	std::cout<<" SELECTOR_SEP101_SET "<<std::endl;
 	if((msg.flags & EVMC_STATIC) != 0) {
@@ -824,9 +824,9 @@ static inline evmc_result evmc_result_from_str(const std::string& str, uint64_t 
 	return evmc_result{
 		.status_code=EVMC_SUCCESS,
 		.gas_left=int64_t(gas),
-		.release = evmc_free_result_memory,
 		.output_data=buffer,
-		.output_size=96};
+		.output_size=96,
+		.release = evmc_free_result_memory};
 }
 
 static inline evmc_result evmc_result_from_uint256(uint256 value, uint64_t gas) {
@@ -836,9 +836,9 @@ static inline evmc_result evmc_result_from_uint256(uint256 value, uint64_t gas) 
 	return evmc_result{
 		.status_code=EVMC_SUCCESS,
 		.gas_left=int64_t(gas),
-		.release = evmc_free_result_memory,
 		.output_data=buffer,
-		.output_size=64};
+		.output_size=64,
+		.release = evmc_free_result_memory};
 }
 
 static inline evmc_result evmc_result_from_bool(bool value, uint64_t gas) {
@@ -850,9 +850,9 @@ static inline evmc_result evmc_result_from_bool(bool value, uint64_t gas) {
 	return evmc_result{
 		.status_code=EVMC_SUCCESS,
 		.gas_left=int64_t(gas),
-		.release = evmc_free_result_memory,
 		.output_data=buffer,
-		.output_size=32};
+		.output_size=32,
+		.release = evmc_free_result_memory};
 }
 
 //    function balanceOf(address owner) external view returns (uint);
@@ -868,9 +868,9 @@ evmc_result evmc_host_context::sep206_balanceOf() {
 	return evmc_result{
 		.status_code=EVMC_SUCCESS,
 		.gas_left=int64_t(msg.gas),
-		.release = evmc_free_result_memory,
 		.output_data=buffer,
-		.output_size=32};
+		.output_size=32,
+		.release = evmc_free_result_memory};
 		
 }
 
@@ -891,9 +891,9 @@ evmc_result evmc_host_context::sep206_allowance() {
 	return evmc_result{
 		.status_code=EVMC_SUCCESS,
 		.gas_left=int64_t(msg.gas),
-		.release = evmc_free_result_memory,
 		.output_data=buffer,
-		.output_size=32};
+		.output_size=32,
+		.release = evmc_free_result_memory};
 }
 
 //    function approve(address spender, uint value) external returns (bool);
