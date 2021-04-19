@@ -10,33 +10,22 @@ import (
 )
 
 //	uint64_t get_creation_counter(uint8_t n) {
-//	20, 1-byte
+//	21, 1-byte
 //	account_info get_account(const evmc_address& addr) {
-//	21, 20-byte
+//	23, 20-byte
 //	bytes get_bytecode(const evmc_address& addr, evmc_bytes32* codehash) {
-//	22, 20-byte
+//	25, 20-byte
 //	bytes get_value(uint64_t seq, const evmc_bytes32& key) {
-//	23, 8-byte, 32-byte
-//	evmc_bytes32 get_block_hash(uint64_t num) {
-//	24, 8-byte
-//	get_pending_transaction
-//	25, 8-byte
+//	27, 8-byte, 32-byte
 
-// odd keys for rabbit
 const CREATION_COUNTER_KEY byte = 21
 const ACCOUNT_KEY byte = 23
 const BYTECODE_KEY byte = 25
 const VALUE_KEY byte = 27
 const CURR_BLOCK_KEY byte = 29
 const CURR_VALIDATORS_KEY byte = 30
-const VALIDATOR_KEY byte = 31
-
-// even keys for trunk
-const StandbyTxKey byte = 100
-
-var StandbyTxQueueKey []byte = []byte{0, 0, 0, 0, 0, 0, 0, 0, 102}
-
-const HEIGHT_KEY byte = 104
+const STANDBY_TX_KEY byte = 100
+var StandbyTxQueueKey []byte = []byte{102}
 
 const TOO_OLD_THRESHOLD uint64 = 10
 
@@ -76,16 +65,10 @@ func GetValueKey(seq uint64, key string) []byte {
 }
 
 func GetStandbyTxKey(num uint64) []byte {
-	bz := make([]byte, 16)
-	bz[7] = StandbyTxKey
-	binary.BigEndian.PutUint64(bz[8:], num)
+	bz := make([]byte, 9)
+	bz[0] = STANDBY_TX_KEY
+	binary.BigEndian.PutUint64(bz[1:], num)
 	return bz
-}
-
-func GetValidatorKey(addr ValAddress) []byte {
-	bz := make([]byte, 1+len(addr))
-	bz[0] = VALIDATOR_KEY
-	return append(bz, addr...)
 }
 
 type EvmLog struct {
