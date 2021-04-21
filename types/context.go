@@ -2,12 +2,10 @@ package types
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/holiman/uint256"
-	"github.com/tendermint/tendermint/crypto/ed25519"
 
 	"github.com/ethereum/go-ethereum/common"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
@@ -127,26 +125,6 @@ func (c *Context) GetCurrBlockBasicInfo() *Block {
 
 func (c *Context) SetCurrBlockBasicInfo(blk *Block) {
 	c.Rbt.Set([]byte{CURR_BLOCK_KEY}, blk.SerializeBasicInfo())
-}
-
-func (c *Context) GetCurrValidators() []ed25519.PubKey {
-	bz := c.Rbt.Get([]byte{CURR_VALIDATORS_KEY})
-	var vals []ed25519.PubKey
-	if bz != nil {
-		err := json.Unmarshal(bz, &vals)
-		if err != nil {
-			panic(err)
-		}
-	}
-	return vals
-}
-
-func (c *Context) SetCurrValidators(vals []ed25519.PubKey) {
-	b, err := json.Marshal(vals)
-	if err != nil {
-		panic(err)
-	}
-	c.Rbt.Set([]byte{CURR_VALIDATORS_KEY}, b)
 }
 
 func (c *Context) StoreBlock(blk *modbtypes.Block) {

@@ -23,7 +23,6 @@ const ACCOUNT_KEY byte = 23
 const BYTECODE_KEY byte = 25
 const VALUE_KEY byte = 27
 const CURR_BLOCK_KEY byte = 29
-const CURR_VALIDATORS_KEY byte = 30
 const STANDBY_TX_KEY byte = 100
 var StandbyTxQueueKey []byte = []byte{102}
 
