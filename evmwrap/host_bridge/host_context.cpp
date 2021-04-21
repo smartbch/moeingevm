@@ -419,6 +419,9 @@ evmc_result evmc_host_context::run_precompiled_contract(const evmc_address& addr
 		return run_precompiled_contract_sep101();
 	} else if(id == SEP206_CONTRACT_ID) {
 		return run_precompiled_contract_sep206();
+	} else if(id == STAKING_CONTRACT_ID) {
+		// The staking contract cannot be called by other contracts
+		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	// the others use golang implementations
 	int ret_value, out_of_gas, osize;
@@ -811,8 +814,8 @@ evmc_result evmc_host_context::run_precompiled_contract_sep101() {
 
 // ========================= SEP206 =========================
 
-static evmc_bytes32 ApprovalEvent = {.bytes = {0,0}};
-static evmc_bytes32 TransaferEvent = {.bytes = {0,0}};
+static evmc_bytes32 ApprovalEvent = {.bytes = {0x25, 0xb9, 0xc3, 0xc7, 0xc8, 0x0a, 0x20, 0x5b, 0x1e, 0x29, 0xb2, 0xf7, 0xc0, 0x14, 0x03, 0xdd, 0xf3, 0x84, 0x1e, 0x7d, 0x42, 0x71, 0x4f, 0xd1, 0x5b, 0x7d, 0xec, 0xeb, 0xe5, 0xe1, 0x5b, 0x8c}};
+static evmc_bytes32 TransaferEvent = {.bytes = {0xef, 0xb3, 0x23, 0xf5, 0x4d, 0x5a, 0xf5, 0x28, 0x16, 0xa1, 0xc4, 0x63, 0xf1, 0xa7, 0x2b, 0x95, 0xaa, 0x8d, 0x37, 0xfc, 0x68, 0xb0, 0xc2, 0x69, 0x9b, 0xc8, 0xe2, 0x1b, 0xad, 0x52, 0xf2, 0xdd}};
 
 static inline evmc_result evmc_result_from_str(const std::string& str, uint64_t gas) {
 	size_t length = 64 + ((str.size()+31)/32)*32;
