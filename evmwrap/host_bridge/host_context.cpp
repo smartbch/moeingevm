@@ -21,7 +21,10 @@ static inline int64_t get_precompiled_id(const evmc_address& addr) {
 }
 
 static inline bool is_precompiled(int64_t id) {
-	return (1 <= id && id <= 9) || id == SEP101_CONTRACT_ID || id == SEP206_CONTRACT_ID;
+	return (1 <= id && id <= 9) ||
+	       id == STAKING_CONTRACT_ID ||
+	       id == SEP101_CONTRACT_ID ||
+	       id == SEP206_CONTRACT_ID;
 }
 
 static inline bool is_precompiled(const evmc_address& addr) {
@@ -736,16 +739,16 @@ inline uint32_t get_selector(const uint8_t* data) { //selector is big-endian byt
 }
 
 evmc_result evmc_host_context::run_precompiled_contract_sep101() {
-	std::cout<<"Dest "<<get_precompiled_id(msg.destination)<<std::endl;
+	//std::cout<<"Dest "<<get_precompiled_id(msg.destination)<<std::endl;
 	if(get_precompiled_id(msg.destination) == SEP101_CONTRACT_ID) {// only allow delegatecall
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	if(msg.depth == 0) { // zero-depth-call is forbidden (not accessible from EOA)
-		std::cout<<" Fail 0 "<<std::endl;
+		//std::cout<<" Fail 0 "<<std::endl;
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	if(msg.input_size < 4 || msg.input_size > 4 + 32*4 + MAX_KEY_SIZE + MAX_VALUE_SIZE) {
-		std::cout<<" Fail 1 "<<std::endl;
+		//std::cout<<" Fail 1 "<<std::endl;
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	uint32_t selector = get_selector(msg.input_data);
@@ -755,21 +758,24 @@ evmc_result evmc_host_context::run_precompiled_contract_sep101() {
 	int offset_ptr_count = (selector == SELECTOR_SEP101_GET)? 1 : 2;
 	uint256 key_len_256 = beptr_to_u256(msg.input_data + 4 + offset_ptr_count*32); // skip offset pointers
 	if(key_len_256 == 0 || key_len_256 > MAX_KEY_SIZE) {
-		std::cout<<" Fail 2 "<<std::endl;
+		//std::cout<<" Fail 2 "<<std::endl;
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	size_t key_len = size_t(key_len_256);
 	size_t key_words = (key_len+31)/32;
 	if(msg.input_size < 4 + offset_ptr_count*(32/*offset word*/+32/*length word*/) + key_words*32) {
-		std::cout<<" Fail 3 "<<std::endl;
+		//std::cout<<" Fail 3 "<<std::endl;
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	evmc_bytes32 key_hash;
 	sha256(msg.input_data + 4 + offset_ptr_count*32 + 32/*length word*/, key_len, key_hash.bytes);
 	if(selector == SELECTOR_SEP101_GET) {
-		std::cout<<" SELECTOR_SEP101_GET "<<std::endl;
+		//std::cout<<" SELECTOR_SEP101_GET "<<std::endl;
 		const bytes& bz = txctrl->get_value(msg.destination, key_hash);
-		int64_t gas = bz.size() * SEP101_GET_GAS_PER_BYTE;
+		int64_t gas = 800;
+		if(bz.size() > 32) {
+			gas += (bz.size() - 32) * SEP101_GET_GAS_PER_BYTE;
+		}
 		if(gas > msg.gas) {
 			return evmc_result{.status_code=EVMC_OUT_OF_GAS};
 		}
@@ -788,7 +794,7 @@ evmc_result evmc_host_context::run_precompiled_contract_sep101() {
 			.output_size=word_count*32,
 			.release = evmc_free_result_memory};
 	}
-	std::cout<<" SELECTOR_SEP101_SET "<<std::endl;
+	//std::cout<<" SELECTOR_SEP101_SET "<<std::endl;
 	if((msg.flags & EVMC_STATIC) != 0) {
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
@@ -798,14 +804,30 @@ evmc_result evmc_host_context::run_precompiled_contract_sep101() {
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	size_t value_len = size_t(value_len_256);
-	int64_t gas = value_len * SEP101_SET_GAS_PER_BYTE;
-	if(gas > msg.gas) {
-		return evmc_result{.status_code=EVMC_OUT_OF_GAS};
+	int64_t gas = 0;
+	if(value_len > 32) {
+		gas = (value_len-32) * SEP101_SET_GAS_PER_BYTE;
 	}
 	if(msg.input_size < 4 + 4*32 + key_words*32 + value_len) {
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
-	txctrl->set_value(msg.destination, key_hash, bytes_info{.data=value_ptr+32, .size=value_len});
+	evmc_storage_status status = txctrl->set_value(msg.destination, key_hash, bytes_info{.data=value_ptr+32, .size=value_len});
+	switch (status) {
+	case EVMC_STORAGE_UNCHANGED:
+	case EVMC_STORAGE_MODIFIED_AGAIN:
+		gas += 800;
+	break;
+	case EVMC_STORAGE_MODIFIED:
+	case EVMC_STORAGE_DELETED:
+		gas += 5000;
+	break;
+	case EVMC_STORAGE_ADDED:
+		gas += 20000;
+	break;
+	}
+	if(gas > msg.gas) {
+		return evmc_result{.status_code=EVMC_OUT_OF_GAS};
+	}
 
 	return evmc_result{
 		.status_code=EVMC_SUCCESS,
@@ -913,7 +935,7 @@ evmc_result evmc_host_context::sep206_approve(bool new_value, bool increase) {
 	memcpy(spender.bytes, spender_offset, 20);
 	evmc_bytes32 key;
 	sha256(owner_and_spender, 64, key.bytes);
-	std::cout<<" approve allowance key "<<to_hex(key)<<" "<<to_hex(msg.sender)<<" "<<to_hex(spender)<<std::endl;
+	//std::cout<<" approve allowance key "<<to_hex(key)<<" "<<to_hex(msg.sender)<<" "<<to_hex(spender)<<std::endl;
 	allowance_entry entry; 
 	memcpy(entry.bytes, msg.input_data + 4 + 32, 32);
 	memcpy(entry.bytes + 32, msg.sender.bytes, 20);
@@ -949,7 +971,7 @@ evmc_result evmc_host_context::sep206_approve(bool new_value, bool increase) {
 //    function transfer(address to, uint value) external returns (bool);
 evmc_result evmc_host_context::sep206_transfer() {
 	if(msg.input_size != 4 + 64) {
-		std::cout<<" Fail A "<<std::endl;
+		//std::cout<<" Fail A "<<std::endl;
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	evmc_address destination;
@@ -977,7 +999,7 @@ evmc_result evmc_host_context::sep206_transfer() {
 //    function transferFrom(address from, address to, uint value) external returns (bool);
 evmc_result evmc_host_context::sep206_transferFrom() {
 	if(msg.input_size != 4 + 96) {
-		std::cout<<" Fail 0 "<<std::endl;
+		//std::cout<<" Fail 0 "<<std::endl;
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	evmc_address source, destination;
@@ -989,7 +1011,7 @@ evmc_result evmc_host_context::sep206_transferFrom() {
 	evmc_uint256be balance_be = get_balance(source);
 	uint256 balance = u256be_to_u256(balance_be);
 	if(balance < amount) {
-		std::cout<<" Fail 1 "<<std::endl;
+		//std::cout<<" Fail 1 "<<std::endl;
 		return evmc_result{.status_code=EVMC_BALANCE_NOT_ENOUGH};
 	}
 	uint8_t owner_and_spender[64]; 
@@ -998,13 +1020,13 @@ evmc_result evmc_host_context::sep206_transferFrom() {
 	memcpy(owner_and_spender + 32 + 12, msg.sender.bytes, 20);
 	evmc_bytes32 key;
 	sha256(owner_and_spender, 64, key.bytes);
-	std::cout<<" allowance key "<<to_hex(key)<<" "<<to_hex(source)<<" "<<to_hex(msg.sender)<<std::endl;
+	//std::cout<<" allowance key "<<to_hex(key)<<" "<<to_hex(source)<<" "<<to_hex(msg.sender)<<std::endl;
 	allowance_entry entry = get_storage_sep206(key);
 	assert(memcmp(entry.bytes + 32, source.bytes, 20)==0);
 	assert(memcmp(entry.bytes + 32 + 20, msg.sender.bytes, 20)==0);
 	uint256 allowance_value = beptr_to_u256(entry.bytes);
 	if(allowance_value < amount) {
-		std::cout<<" Fail 2 "<<int64_t(allowance_value)<<" "<<int64_t(amount)<<std::endl;
+		//std::cout<<" Fail 2 "<<int64_t(allowance_value)<<" "<<int64_t(amount)<<std::endl;
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	bool is_nop;
@@ -1023,7 +1045,7 @@ evmc_result evmc_host_context::sep206_transferFrom() {
 }
 
 evmc_result evmc_host_context::run_precompiled_contract_sep206() {
-	std::cout<<"Dest "<<get_precompiled_id(msg.destination)<<std::endl;
+	//std::cout<<"Dest "<<get_precompiled_id(msg.destination)<<std::endl;
 	if(get_precompiled_id(msg.destination) != SEP206_CONTRACT_ID) {//forbidden delegateccall
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
