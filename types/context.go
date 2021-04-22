@@ -350,3 +350,27 @@ func (c *Context) GetTxListByHeight(height uint32) (txs []*Transaction, err erro
 	}
 	return txs, err
 }
+
+// return the times addr acts as a to-address of a transaction
+func (c *Context) GetToAddressCount(addr common.Address) int64 {
+	k := append([]byte{modbtypes.TO_ADDR_KEY}, addr[:]...)
+	return c.Db.QueryNotificationCounter(k)
+}
+
+// return the times addr acts as a to-address of a SEP20 Transfer event at some contract
+func (c *Context) GetSep20ToAddressCount(contract common.Address, addr common.Address) int64 {
+	var zero12 [12]byte
+	k := append([]byte{modbtypes.TRANS_TO_ADDR_KEY}, contract[:]...)
+	k = append(k, zero12[:]...)
+	k = append(k, addr[:]...)
+	return c.Db.QueryNotificationCounter(k)
+}
+
+// return the times addr acts as a from-address of a SEP20 Transfer event at some contract
+func (c *Context) GetSep20FromAddressCount(contract common.Address, addr common.Address) int64 {
+	var zero12 [12]byte
+	k := append([]byte{modbtypes.TRANS_FROM_ADDR_KEY}, contract[:]...)
+	k = append(k, zero12[:]...)
+	k = append(k, addr[:]...)
+	return c.Db.QueryNotificationCounter(k)
+}
