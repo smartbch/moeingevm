@@ -161,6 +161,10 @@ func (c *Context) GetTxByHash(txHash common.Hash) (tx *Transaction, err error) {
 	return
 }
 
+func (c *Context) GetBlockHashByHeight(height uint64) [32]byte {
+	return c.Db.GetBlockHashByHeight(int64(height))
+}
+
 func (c *Context) GetBlockByHeight(height uint64) (*Block, error) {
 	bz := c.Db.GetBlockByHeight(int64(height))
 	if len(bz) == 0 {

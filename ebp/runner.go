@@ -226,11 +226,8 @@ func (runner *TxRunner) changeValue(chg_value *changed_value) {
 
 //hash => height; height => block in db
 func (runner *TxRunner) getBlockHash(num C.uint64_t) (result evmc_bytes32) {
-	blk, err := runner.Ctx.GetBlockByHeight(uint64(num))
-	if err != nil {
-		panic(err)
-	}
-	writeCBytes32WithSlice(&result, blk.Hash[:])
+	hash := runner.Ctx.GetBlockHashByHeight(uint64(num))
+	writeCBytes32WithSlice(&result, hash[:])
 	return
 }
 
