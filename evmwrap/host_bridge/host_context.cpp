@@ -1091,10 +1091,10 @@ evmc_result evmc_host_context::run_precompiled_contract_sep206() {
 		default:
 			return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
-	if(gas > msg.gas) {
+	if(int64_t(gas) > msg.gas) {
 		return evmc_result{.status_code=EVMC_OUT_OF_GAS};
 	}
-	msg.gas -= gas;
+	msg.gas -= int64_t(gas);
 	switch(selector) { // staticcall must be readonly
 		case SELECTOR_SEP206_APPROVE:
 		case SELECTOR_SEP206_INCREASEALLOWANCE:
