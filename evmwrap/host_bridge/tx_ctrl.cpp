@@ -462,7 +462,6 @@ evmc_storage_status tx_control::set_value(const evmc_address& addr, const evmc_b
 }
 
 evmc_storage_status tx_control::set_value(uint64_t sequence, const evmc_bytes32& key, bytes_info raw_value) {
-	std::cout<<"here set_value "<<sequence<<std::endl;
 	journal_entry e {.type=VALUE_CHG};
 	e.value_change.key = key;
 	e.value_change.sequence = sequence;
