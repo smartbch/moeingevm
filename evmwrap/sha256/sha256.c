@@ -18,104 +18,7 @@
 #include <memory.h>
 #include "sha256.h"
 
-/* Include the GCC super header */
-#if defined(__GNUC__)
-# include <stdint.h>
-# include <x86intrin.h>
-#endif
-
-/* Microsoft supports Intel SHA ACLE extensions as of Visual Studio 2015 */
-#if defined(_MSC_VER)
-# include <immintrin.h>
-# define WIN32_LEAN_AND_MEAN
-# include <Windows.h>
-typedef UINT32 uint32_t;
-typedef UINT8 uint8_t;
-#endif
-
-///****************************** MACROS ******************************/
-//#define ROTLEFT(a,b) (((a) << (b)) | ((a) >> (32-(b))))
-//#define ROTRIGHT(a,b) (((a) >> (b)) | ((a) << (32-(b))))
-//
-//#define CH(x,y,z) (((x) & (y)) ^ (~(x) & (z)))
-//#define MAJ(x,y,z) (((x) & (y)) ^ ((x) & (z)) ^ ((y) & (z)))
-//#define EP0(x) (ROTRIGHT(x,2) ^ ROTRIGHT(x,13) ^ ROTRIGHT(x,22))
-//#define EP1(x) (ROTRIGHT(x,6) ^ ROTRIGHT(x,11) ^ ROTRIGHT(x,25))
-//#define SIG0(x) (ROTRIGHT(x,7) ^ ROTRIGHT(x,18) ^ ((x) >> 3))
-//#define SIG1(x) (ROTRIGHT(x,17) ^ ROTRIGHT(x,19) ^ ((x) >> 10))
-//
-///**************************** VARIABLES *****************************/
-//static const WORD k[64] = {
-//	0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
-//	0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
-//	0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
-//	0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
-//	0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
-//	0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
-//	0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
-//	0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
-//};
-//
-///*********************** FUNCTION DEFINITIONS ***********************/
-//void sha256_transform(uint32_t *state, const BYTE data[])
-//{
-//	WORD a, b, c, d, e, f, g, h, i, j, t1, t2, m[64];
-//
-//	for (i = 0, j = 0; i < 16; ++i, j += 4)
-//		m[i] = (data[j] << 24) | (data[j + 1] << 16) | (data[j + 2] << 8) | (data[j + 3]);
-//	for ( ; i < 64; ++i)
-//		m[i] = SIG1(m[i - 2]) + m[i - 7] + SIG0(m[i - 15]) + m[i - 16];
-//
-//	a = state[0];
-//	b = state[1];
-//	c = state[2];
-//	d = state[3];
-//	e = state[4];
-//	f = state[5];
-//	g = state[6];
-//	h = state[7];
-//
-//	for (i = 0; i < 64; ++i) {
-//		t1 = h + EP1(e) + CH(e,f,g) + k[i] + m[i];
-//		t2 = EP0(a) + MAJ(a,b,c);
-//		h = g;
-//		g = f;
-//		f = e;
-//		e = d + t1;
-//		d = c;
-//		c = b;
-//		b = a;
-//		a = t1 + t2;
-//	}
-//
-//	state[0] += a;
-//	state[1] += b;
-//	state[2] += c;
-//	state[3] += d;
-//	state[4] += e;
-//	state[5] += f;
-//	state[6] += g;
-//	state[7] += h;
-//}
-//
-
-#define ROTATE(x,y)  (((x)>>(y)) | ((x)<<(32-(y))))
-#define Sigma0(x)    (ROTATE((x), 2) ^ ROTATE((x),13) ^ ROTATE((x),22))
-#define Sigma1(x)    (ROTATE((x), 6) ^ ROTATE((x),11) ^ ROTATE((x),25))
-#define sigma0(x)    (ROTATE((x), 7) ^ ROTATE((x),18) ^ ((x)>> 3))
-#define sigma1(x)    (ROTATE((x),17) ^ ROTATE((x),19) ^ ((x)>>10))
-
-#define Ch(x,y,z)    (((x) & (y)) ^ ((~(x)) & (z)))
-#define Maj(x,y,z)   (((x) & (y)) ^ ((x) & (z)) ^ ((y) & (z)))
-
-/* Avoid undefined behavior                    */
-/* https://stackoverflow.com/q/29538935/608639 */
-uint32_t B2U32(uint8_t val, uint8_t sh)
-{
-    return ((uint32_t)val) << sh;
-}
-
-static const uint32_t K256[] =
+static const uint32_t K[] =
 {
     0x428A2F98, 0x71374491, 0xB5C0FBCF, 0xE9B5DBA5,
     0x3956C25B, 0x59F111F1, 0x923F82A4, 0xAB1C5ED5,
@@ -134,6 +37,214 @@ static const uint32_t K256[] =
     0x748F82EE, 0x78A5636F, 0x84C87814, 0x8CC70208,
     0x90BEFFFA, 0xA4506CEB, 0xBEF9A3F7, 0xC67178F2
 };
+
+#if defined(__arm__) || defined(__aarch32__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM)
+// ============== ARM64 begin =======================
+// All the ARM servers supports SHA256 instructions
+# if defined(__GNUC__)
+#  include <stdint.h>
+# endif
+# if defined(__ARM_NEON) || defined(_MSC_VER) || defined(__GNUC__)
+#  include <arm_neon.h>
+# endif
+/* GCC and LLVM Clang, but not Apple Clang */
+# if defined(__GNUC__) && !defined(__apple_build_version__)
+#  if defined(__ARM_ACLE) || defined(__ARM_FEATURE_CRYPTO)
+#   include <arm_acle.h>
+#  endif
+# endif
+void sha256_process(uint32_t state[8], const uint8_t data[], uint32_t length)
+{
+    uint32x4_t STATE0, STATE1, ABEF_SAVE, CDGH_SAVE;
+    uint32x4_t MSG0, MSG1, MSG2, MSG3;
+    uint32x4_t TMP0, TMP1, TMP2;
+
+    /* Load state */
+    STATE0 = vld1q_u32(&state[0]);
+    STATE1 = vld1q_u32(&state[4]);
+
+    while (length >= 64)
+    {
+        /* Save state */
+        ABEF_SAVE = STATE0;
+        CDGH_SAVE = STATE1;
+
+        /* Load message */
+        MSG0 = vld1q_u32((const uint32_t *)(data +  0));
+        MSG1 = vld1q_u32((const uint32_t *)(data + 16));
+        MSG2 = vld1q_u32((const uint32_t *)(data + 32));
+        MSG3 = vld1q_u32((const uint32_t *)(data + 48));
+
+        /* Reverse for little endian */
+        MSG0 = vreinterpretq_u32_u8(vrev32q_u8(vreinterpretq_u8_u32(MSG0)));
+        MSG1 = vreinterpretq_u32_u8(vrev32q_u8(vreinterpretq_u8_u32(MSG1)));
+        MSG2 = vreinterpretq_u32_u8(vrev32q_u8(vreinterpretq_u8_u32(MSG2)));
+        MSG3 = vreinterpretq_u32_u8(vrev32q_u8(vreinterpretq_u8_u32(MSG3)));
+
+        TMP0 = vaddq_u32(MSG0, vld1q_u32(&K[0x00]));
+
+        /* Rounds 0-3 */
+        MSG0 = vsha256su0q_u32(MSG0, MSG1);
+        TMP2 = STATE0;
+        TMP1 = vaddq_u32(MSG1, vld1q_u32(&K[0x04]));
+        STATE0 = vsha256hq_u32(STATE0, STATE1, TMP0);
+        STATE1 = vsha256h2q_u32(STATE1, TMP2, TMP0);
+        MSG0 = vsha256su1q_u32(MSG0, MSG2, MSG3);
+
+        /* Rounds 4-7 */
+        MSG1 = vsha256su0q_u32(MSG1, MSG2);
+        TMP2 = STATE0;
+        TMP0 = vaddq_u32(MSG2, vld1q_u32(&K[0x08]));
+        STATE0 = vsha256hq_u32(STATE0, STATE1, TMP1);
+        STATE1 = vsha256h2q_u32(STATE1, TMP2, TMP1);
+        MSG1 = vsha256su1q_u32(MSG1, MSG3, MSG0);
+
+        /* Rounds 8-11 */
+        MSG2 = vsha256su0q_u32(MSG2, MSG3);
+        TMP2 = STATE0;
+        TMP1 = vaddq_u32(MSG3, vld1q_u32(&K[0x0c]));
+        STATE0 = vsha256hq_u32(STATE0, STATE1, TMP0);
+        STATE1 = vsha256h2q_u32(STATE1, TMP2, TMP0);
+        MSG2 = vsha256su1q_u32(MSG2, MSG0, MSG1);
+
+        /* Rounds 12-15 */
+        MSG3 = vsha256su0q_u32(MSG3, MSG0);
+        TMP2 = STATE0;
+        TMP0 = vaddq_u32(MSG0, vld1q_u32(&K[0x10]));
+        STATE0 = vsha256hq_u32(STATE0, STATE1, TMP1);
+        STATE1 = vsha256h2q_u32(STATE1, TMP2, TMP1);
+        MSG3 = vsha256su1q_u32(MSG3, MSG1, MSG2);
+
+        /* Rounds 16-19 */
+        MSG0 = vsha256su0q_u32(MSG0, MSG1);
+        TMP2 = STATE0;
+        TMP1 = vaddq_u32(MSG1, vld1q_u32(&K[0x14]));
+        STATE0 = vsha256hq_u32(STATE0, STATE1, TMP0);
+        STATE1 = vsha256h2q_u32(STATE1, TMP2, TMP0);
+        MSG0 = vsha256su1q_u32(MSG0, MSG2, MSG3);
+
+        /* Rounds 20-23 */
+        MSG1 = vsha256su0q_u32(MSG1, MSG2);
+        TMP2 = STATE0;
+        TMP0 = vaddq_u32(MSG2, vld1q_u32(&K[0x18]));
+        STATE0 = vsha256hq_u32(STATE0, STATE1, TMP1);
+        STATE1 = vsha256h2q_u32(STATE1, TMP2, TMP1);
+        MSG1 = vsha256su1q_u32(MSG1, MSG3, MSG0);
+
+        /* Rounds 24-27 */
+        MSG2 = vsha256su0q_u32(MSG2, MSG3);
+        TMP2 = STATE0;
+        TMP1 = vaddq_u32(MSG3, vld1q_u32(&K[0x1c]));
+        STATE0 = vsha256hq_u32(STATE0, STATE1, TMP0);
+        STATE1 = vsha256h2q_u32(STATE1, TMP2, TMP0);
+        MSG2 = vsha256su1q_u32(MSG2, MSG0, MSG1);
+
+        /* Rounds 28-31 */
+        MSG3 = vsha256su0q_u32(MSG3, MSG0);
+        TMP2 = STATE0;
+        TMP0 = vaddq_u32(MSG0, vld1q_u32(&K[0x20]));
+        STATE0 = vsha256hq_u32(STATE0, STATE1, TMP1);
+        STATE1 = vsha256h2q_u32(STATE1, TMP2, TMP1);
+        MSG3 = vsha256su1q_u32(MSG3, MSG1, MSG2);
+
+        /* Rounds 32-35 */
+        MSG0 = vsha256su0q_u32(MSG0, MSG1);
+        TMP2 = STATE0;
+        TMP1 = vaddq_u32(MSG1, vld1q_u32(&K[0x24]));
+        STATE0 = vsha256hq_u32(STATE0, STATE1, TMP0);
+        STATE1 = vsha256h2q_u32(STATE1, TMP2, TMP0);
+        MSG0 = vsha256su1q_u32(MSG0, MSG2, MSG3);
+
+        /* Rounds 36-39 */
+        MSG1 = vsha256su0q_u32(MSG1, MSG2);
+        TMP2 = STATE0;
+        TMP0 = vaddq_u32(MSG2, vld1q_u32(&K[0x28]));
+        STATE0 = vsha256hq_u32(STATE0, STATE1, TMP1);
+        STATE1 = vsha256h2q_u32(STATE1, TMP2, TMP1);
+        MSG1 = vsha256su1q_u32(MSG1, MSG3, MSG0);
+
+        /* Rounds 40-43 */
+        MSG2 = vsha256su0q_u32(MSG2, MSG3);
+        TMP2 = STATE0;
+        TMP1 = vaddq_u32(MSG3, vld1q_u32(&K[0x2c]));
+        STATE0 = vsha256hq_u32(STATE0, STATE1, TMP0);
+        STATE1 = vsha256h2q_u32(STATE1, TMP2, TMP0);
+        MSG2 = vsha256su1q_u32(MSG2, MSG0, MSG1);
+
+        /* Rounds 44-47 */
+        MSG3 = vsha256su0q_u32(MSG3, MSG0);
+        TMP2 = STATE0;
+        TMP0 = vaddq_u32(MSG0, vld1q_u32(&K[0x30]));
+        STATE0 = vsha256hq_u32(STATE0, STATE1, TMP1);
+        STATE1 = vsha256h2q_u32(STATE1, TMP2, TMP1);
+        MSG3 = vsha256su1q_u32(MSG3, MSG1, MSG2);
+
+        /* Rounds 48-51 */
+        TMP2 = STATE0;
+        TMP1 = vaddq_u32(MSG1, vld1q_u32(&K[0x34]));
+        STATE0 = vsha256hq_u32(STATE0, STATE1, TMP0);
+        STATE1 = vsha256h2q_u32(STATE1, TMP2, TMP0);
+
+        /* Rounds 52-55 */
+        TMP2 = STATE0;
+        TMP0 = vaddq_u32(MSG2, vld1q_u32(&K[0x38]));
+        STATE0 = vsha256hq_u32(STATE0, STATE1, TMP1);
+        STATE1 = vsha256h2q_u32(STATE1, TMP2, TMP1);
+
+        /* Rounds 56-59 */
+        TMP2 = STATE0;
+        TMP1 = vaddq_u32(MSG3, vld1q_u32(&K[0x3c]));
+        STATE0 = vsha256hq_u32(STATE0, STATE1, TMP0);
+        STATE1 = vsha256h2q_u32(STATE1, TMP2, TMP0);
+
+        /* Rounds 60-63 */
+        TMP2 = STATE0;
+        STATE0 = vsha256hq_u32(STATE0, STATE1, TMP1);
+        STATE1 = vsha256h2q_u32(STATE1, TMP2, TMP1);
+
+        /* Combine state */
+        STATE0 = vaddq_u32(STATE0, ABEF_SAVE);
+        STATE1 = vaddq_u32(STATE1, CDGH_SAVE);
+
+        data += 64;
+        length -= 64;
+    }
+
+    /* Save state */
+    vst1q_u32(&state[0], STATE0);
+    vst1q_u32(&state[4], STATE1);
+}
+
+// ============== ARM64 end =======================
+#else
+// ============== x86-64 begin =======================
+/* Include the GCC super header */
+#if defined(__GNUC__)
+# include <stdint.h>
+# include <x86intrin.h>
+#endif
+
+/* Microsoft supports Intel SHA ACLE extensions as of Visual Studio 2015 */
+#if defined(_MSC_VER)
+# include <immintrin.h>
+# define WIN32_LEAN_AND_MEAN
+# include <Windows.h>
+#endif
+#define ROTATE(x,y)  (((x)>>(y)) | ((x)<<(32-(y))))
+#define Sigma0(x)    (ROTATE((x), 2) ^ ROTATE((x),13) ^ ROTATE((x),22))
+#define Sigma1(x)    (ROTATE((x), 6) ^ ROTATE((x),11) ^ ROTATE((x),25))
+#define sigma0(x)    (ROTATE((x), 7) ^ ROTATE((x),18) ^ ((x)>> 3))
+#define sigma1(x)    (ROTATE((x),17) ^ ROTATE((x),19) ^ ((x)>>10))
+
+#define Ch(x,y,z)    (((x) & (y)) ^ ((~(x)) & (z)))
+#define Maj(x,y,z)   (((x) & (y)) ^ ((x) & (z)) ^ ((y) & (z)))
+
+/* Avoid undefined behavior                    */
+/* https://stackoverflow.com/q/29538935/608639 */
+uint32_t B2U32(uint8_t val, uint8_t sh)
+{
+    return ((uint32_t)val) << sh;
+}
 
 void sha256_process_c(uint32_t state[8], const uint8_t data[], size_t length)
 {
@@ -160,7 +271,7 @@ void sha256_process_c(uint32_t state[8], const uint8_t data[], size_t length)
             T1 = h;
             T1 += Sigma1(e);
             T1 += Ch(e, f, g);
-            T1 += K256[i];
+            T1 += K[i];
             T1 += X[i];
 
             T2 = Sigma0(a);
@@ -184,7 +295,7 @@ void sha256_process_c(uint32_t state[8], const uint8_t data[], size_t length)
             s1 = sigma1(s1);
 
             T1 = X[i & 0xf] += s0 + s1 + X[(i + 9) & 0xf];
-            T1 += h + Sigma1(e) + Ch(e, f, g) + K256[i];
+            T1 += h + Sigma1(e) + Ch(e, f, g) + K[i];
             T2 = Sigma0(a) + Maj(a, b, c);
             h = g;
             g = f;
@@ -209,7 +320,7 @@ void sha256_process_c(uint32_t state[8], const uint8_t data[], size_t length)
 
 /* Process multiple blocks. The caller is responsible for setting the initial */
 /*  state, and the caller is responsible for padding the final block.        */
-void sha256_process_x86(uint32_t state[8], const uint8_t data[], size_t length)
+void sha256_process_asm(uint32_t state[8], const uint8_t data[], size_t length)
 {
     __m128i STATE0, STATE1;
     __m128i MSG, TMP;
@@ -431,21 +542,23 @@ int supports_sha_ni(void)
 }
 
 #endif /* defined(__clang__) || defined(__GNUC__) */
-void sha256_process_wrap(uint32_t state[8], const uint8_t data[], size_t length) {
+
+void sha256_process(uint32_t state[8], const uint8_t data[], size_t length) {
     static int has_sha_ni = -1;
     if(has_sha_ni == -1 ) {
         has_sha_ni = supports_sha_ni();
     }
 
     if(has_sha_ni) {
-        sha256_process_x86(state, data, length);
-	//printf("In sha256_process_x86 length %zu\n", length);
+        sha256_process_asm(state, data, length);
+	//printf("In sha256_process_asm length %zu\n", length);
     } else {
         sha256_process_c(state, data, length);
 	//printf("In sha256_process_c length %zu\n", length);
     }
-
 }
+// ============== x86-64 end =======================
+#endif
 
 void sha256_init(SHA256_CTX *ctx)
 {
@@ -467,7 +580,7 @@ void sha256_update(SHA256_CTX *ctx, const BYTE data[], size_t len)
 
 	size_t rounded = 64*(len/64);
 	if(rounded != 0) {
-		sha256_process_wrap(ctx->state, data, rounded);
+		sha256_process(ctx->state, data, rounded);
 	}
 
 	ctx->bitlen = rounded*8;
@@ -494,7 +607,7 @@ void sha256_final(SHA256_CTX *ctx, BYTE hash[])
 		ctx->data[i++] = 0x80;
 		while (i < 64)
 			ctx->data[i++] = 0x00;
-		sha256_process_wrap(ctx->state, ctx->data, 64);
+		sha256_process(ctx->state, ctx->data, 64);
 		memset(ctx->data, 0, 56);
 	}
 
@@ -508,7 +621,7 @@ void sha256_final(SHA256_CTX *ctx, BYTE hash[])
 	ctx->data[58] = ctx->bitlen >> 40;
 	ctx->data[57] = ctx->bitlen >> 48;
 	ctx->data[56] = ctx->bitlen >> 56;
-	sha256_process_wrap(ctx->state, ctx->data, 64);
+	sha256_process(ctx->state, ctx->data, 64);
 
 	// Since this implementation uses little endian byte ordering and SHA uses big endian,
 	// reverse all the bytes when copying the final state to the output hash.
