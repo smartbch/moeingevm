@@ -43,6 +43,7 @@ var Runners []*TxRunner
 const (
 	RpcRunnersIdStart int = 10000
 	RpcRunnersCount   int = 256
+	SMALL_BUF_SIZE    int = int(C.SMALL_BUF_SIZE)
 )
 
 // Its usage is similar with Runners. Runners are for transactions in block. RpcRunners are for transactions

@@ -55,8 +55,8 @@ func call_precompiled_contract(contract_addr *evmc_address,
 		return
 	}
 	size := len(output)
-	if size > 256 {
-		size = 256
+	if size > SMALL_BUF_SIZE {
+		size = SMALL_BUF_SIZE
 	}
 	*output_size = C.int(size)
 	//fmt.Printf("PRECOM %s %d  %d ", common.Address(addr).String(), len(output), size)
