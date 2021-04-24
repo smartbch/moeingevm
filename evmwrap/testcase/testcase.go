@@ -430,7 +430,6 @@ func toHex(bz []byte) string {
 	return hex.EncodeToString(bz)
 }
 
-
 var (
 	// record pending gas fee and refund
 	systemContractAddress = [20]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

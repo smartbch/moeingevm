@@ -10,8 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/holiman/uint256"
-	"github.com/smartbch/moeingads/store/rabbit"
 	"github.com/seehuhn/mt19937"
+	"github.com/smartbch/moeingads/store/rabbit"
 
 	"github.com/smartbch/moeingevm/types"
 	"github.com/smartbch/moeingevm/utils"
@@ -95,7 +95,7 @@ func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice uint64) {
 		return
 	}
 	infoList, ctxAA := exec.parallelReadAccounts(minGasPrice)
-	addr2idx := make(map[common.Address]int)      // map address to ctxAA's index
+	addr2idx := make(map[common.Address]int) // map address to ctxAA's index
 	for idx, entry := range ctxAA {
 		for _, addr := range entry.accounts {
 			if _, ok := addr2idx[addr]; !ok {
@@ -163,11 +163,11 @@ func (exec *txEngine) parallelReadAccounts(minGasPrice uint64) (infoList []*prep
 	estimatedSize := len(exec.txList)/exec.parallelNum + 1
 	parallelRun(exec.parallelNum, func(workerId int) {
 		ctxAA[workerId] = &ctxAndAccounts{
-			ctx: *exec.cleanCtx.WithRbtCopy(),
-			accounts: make([]common.Address, 0, estimatedSize),
-			changed: false,
+			ctx:         *exec.cleanCtx.WithRbtCopy(),
+			accounts:    make([]common.Address, 0, estimatedSize),
+			changed:     false,
 			totalGasFee: uint256.NewInt(),
-			addr2nonce: make(map[common.Address]uint64),
+			addr2nonce:  make(map[common.Address]uint64),
 		}
 		for {
 			myIdx := atomic.AddInt64(&sharedIdx, 1)
@@ -199,7 +199,7 @@ func (exec *txEngine) parallelReadAccounts(minGasPrice uint64) (infoList []*prep
 				infoList[myIdx].statusStr = "invalid gas limit"
 				continue // skip invalid tx gas limit
 			}
-      // access disk to fetch the account's detail
+			// access disk to fetch the account's detail
 			acc := ctxAA[workerId].ctx.GetAccount(sender)
 			infoList[myIdx].valid = acc != nil
 			if acc == nil {

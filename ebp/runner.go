@@ -85,15 +85,15 @@ func getRunner(i int) (runner *TxRunner) {
 }
 
 type TxRunner struct {
-	id      int64
-	Ctx     types.Context
-	GasUsed uint64
+	id        int64
+	Ctx       types.Context
+	GasUsed   uint64
 	GasRefund uint256.Int
-	Tx      *types.TxToRun
-	Logs    []types.EvmLog
-	Status  int
-	OutData []byte
-	ForRpc  bool
+	Tx        *types.TxToRun
+	Logs      []types.EvmLog
+	Status    int
+	OutData   []byte
+	ForRpc    bool
 
 	CreatedContractAddress common.Address
 }

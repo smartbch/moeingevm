@@ -24,6 +24,7 @@ const BYTECODE_KEY byte = 25
 const VALUE_KEY byte = 27
 const CURR_BLOCK_KEY byte = 29
 const STANDBY_TX_KEY byte = 100
+
 var StandbyTxQueueKey []byte = []byte{102}
 
 const TOO_OLD_THRESHOLD uint64 = 10
