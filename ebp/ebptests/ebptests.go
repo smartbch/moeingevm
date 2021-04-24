@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"math/big"
 	"os"
 	"os/exec"
@@ -89,6 +90,7 @@ var (
 var IgnoreFiles []string
 
 func runTestCase(filename string, theCase *tc.TestCase, printLog bool) {
+	ebp.MaxTxGasLimit = math.MaxUint64
 	for _, f := range IgnoreFiles {
 		if strings.Index(filename, f) != -1 {
 			fmt.Printf("Ignore File: %s\n", filename)
@@ -134,9 +136,11 @@ func runTestCase(filename string, theCase *tc.TestCase, printLog bool) {
 	txEngine.SetContext(ctx)
 	txEngine.CollectTx(currTx)
 	txEngine.Prepare(0, 0)
+	txList := txEngine.CommittedTxs()
+	fmt.Printf("after Prepare txList len %d\n", len(txList))
 	txEngine.Execute(&currBlock.BlockInfo)
 	trunk.Close(true)
-	txList := txEngine.CommittedTxs()
+	txList = txEngine.CommittedTxs()
 	var gasFee uint256.Int
 	gasFee.Mul(uint256.NewInt().SetUint64(txList[0].GasUsed),
 		utils.U256FromSlice32(txList[0].GasPrice[:]))

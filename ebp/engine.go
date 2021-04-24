@@ -3,7 +3,6 @@ package ebp
 import (
 	"encoding/binary"
 	"errors"
-	//"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -18,7 +17,7 @@ import (
 )
 
 var (
-	MaxTxGasLimit = 1000_0000
+	MaxTxGasLimit uint64 = 1000_0000
 )
 
 var _ TxExecutor = (*txEngine)(nil)
@@ -194,7 +193,7 @@ func (exec *txEngine) parallelReadAccounts(minGasPrice uint64) (infoList []*prep
 				infoList[myIdx].statusStr = "invalid gas price"
 				continue // skip invalid tx gas price
 			}
-			if tx.Gas() > uint64(MaxTxGasLimit) {
+			if tx.Gas() > MaxTxGasLimit {
 				infoList[myIdx].valid = false
 				infoList[myIdx].statusStr = "invalid gas limit"
 				continue // skip invalid tx gas limit

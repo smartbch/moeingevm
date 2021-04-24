@@ -92,7 +92,6 @@ public:
 	evmc_bytes32 get_storage(const evmc_address& addr, const evmc_bytes32& key) {
 		evmc_bytes32 result;
 		const bytes& bz = txctrl->get_value(addr, key);
-		std::cout<<" size"<<bz.size()<<std::endl;
 		if(bz.size() == 0) { // if the underlying KV pair does not exist, return all zero
 			return ZERO_BYTES32;
 		}
