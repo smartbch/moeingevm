@@ -169,6 +169,10 @@ type DumbSigner struct {
 
 var _ coretypes.Signer = (*DumbSigner)(nil)
 
+func (signer *DumbSigner) ChainID() *big.Int {
+	return big.NewInt(1)
+}
+
 // Sender returns the sender address of the transaction.
 func (signer *DumbSigner) Sender(tx *coretypes.Transaction) (addr common.Address, err error) {
 	_, r, _ := tx.RawSignatureValues()
