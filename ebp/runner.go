@@ -2,7 +2,7 @@ package ebp
 
 import (
 	"encoding/binary"
-	"fmt"
+	//"fmt"
 	"runtime"
 	"sync/atomic"
 	"unsafe"
@@ -238,7 +238,7 @@ func (runner *TxRunner) refundGasFee(ret_value *evmc_result, refund C.uint64_t) 
 		return
 	}
 	gasUsed := runner.Tx.Gas - uint64(ret_value.gas_left)
-	fmt.Printf("runner.Tx.Gas %d uint64(ret_value.gas_left) %d\n", runner.Tx.Gas, uint64(ret_value.gas_left))
+	//fmt.Printf("runner.Tx.Gas %d uint64(ret_value.gas_left) %d\n", runner.Tx.Gas, uint64(ret_value.gas_left))
 	half := (gasUsed + 1) / 2
 	if gasUsed < uint64(refund)+half {
 		gasUsed = half
@@ -253,9 +253,7 @@ func (runner *TxRunner) refundGasFee(ret_value *evmc_result, refund C.uint64_t) 
 	returnedGasFee.Mul(uint256.NewInt().SetUint64(runner.Tx.Gas-gasUsed), gasPrice)
 	acc := types.NewAccountInfo(runner.Ctx.Rbt.Get(k))
 	x := utils.U256FromSlice32(acc.BalanceSlice())
-	fmt.Printf("old Balance %s\n", x)
 	x.Add(x, &returnedGasFee)
-	fmt.Printf("new Balance %s\n", x)
 	copy(acc.BalanceSlice(), utils.U256ToSlice32(x))
 	runner.Ctx.Rbt.Set(k, acc.Bytes())
 	runner.GasRefund = returnedGasFee

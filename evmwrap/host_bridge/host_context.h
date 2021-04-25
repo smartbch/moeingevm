@@ -55,9 +55,16 @@ evmc_address create_contract_addr(const evmc_address& creater, uint64_t nonce);
 
 evmc_address create2_contract_addr(const evmc_address& creater, const evmc_bytes32& salt, const evmc_bytes32& codehash);
 
-static bool is_zero_bytes32(const evmc_bytes32* bytes32) {
-	auto ptr = reinterpret_cast<const uint64_t*>(bytes32);
+static inline bool is_zero_bytes32(const uint8_t* u8ptr) {
+	auto ptr = reinterpret_cast<const uint64_t*>(u8ptr);
 	return (ptr[0]|ptr[1]|ptr[2]|ptr[3]) == 0;
+}
+
+static inline bool is_zero_address(const evmc_address addr) {
+	for(size_t i = 0; i < sizeof(evmc_address); i++) {
+		if(addr.bytes[i] != 0) return false;
+	}
+	return true;
 }
 
 const int ALLOWANCE_ENTRY_SIZE = 32+20+20;
@@ -111,11 +118,13 @@ public:
 	}
 	evmc_storage_status set_storage(const evmc_address& addr, const evmc_bytes32& key, const evmc_bytes32& value) {
 		// if the value is zero, set zero-length value to tx_control, which will later be taken as deletion
-		size_t size = is_zero_bytes32(&value)? 0 : 32;
+		size_t size = is_zero_bytes32(value.bytes)? 0 : 32;
 		return txctrl->set_value(addr, key, bytes_info{.data=&value.bytes[0], .size=size});
 	}
 	void set_storage_sep206(const evmc_bytes32& key, const allowance_entry& value) {
-		txctrl->set_value(SEP206_SEQUENCE, key, bytes_info{.data=value.bytes, .size=ALLOWANCE_ENTRY_SIZE});
+		// if the value is zero, set zero-length value to tx_control, which will later be taken as deletion
+		size_t size = is_zero_bytes32(value.bytes)? 0 : ALLOWANCE_ENTRY_SIZE;
+		txctrl->set_value(SEP206_SEQUENCE, key, bytes_info{.data=value.bytes, .size=size});
 	}
 	evmc_uint256be get_balance(const evmc_address& addr) {
 		return u256_to_u256be(get_balance_as_uint256(addr));

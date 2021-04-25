@@ -402,7 +402,6 @@ public:
 		return cstate.get_value(info.sequence, key);
 	}
 	const bytes& get_value(uint64_t sequence, const evmc_bytes32& key) {
-		std::cout<<"here get_value "<<sequence<<std::endl;
 		return cstate.get_value(sequence, key);
 	}
 	const bytecode_entry& get_bytecode_entry(const evmc_address& addr) {
