@@ -88,13 +88,13 @@ func (exec *txEngine) SetContext(ctx *types.Context) {
 }
 
 // Check transactions' signatures and insert the valid ones into standby queue
-func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice uint64) {
+func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice uint64) (touchedAddrs map[common.Address]int) {
 	if len(exec.txList) == 0 {
 		exec.cleanCtx.Close(false)
 		return
 	}
 	infoList, ctxAA := exec.parallelReadAccounts(minGasPrice)
-	addr2idx := make(map[common.Address]int) // map address to ctxAA's index
+	addr2idx := make(map[common.Address]int, len(exec.txList)) // map address to ctxAA's index
 	for idx, entry := range ctxAA {
 		for _, addr := range entry.accounts {
 			if _, ok := addr2idx[addr]; !ok {
@@ -150,6 +150,7 @@ func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice uint64) {
 	//write ctx state to trunk
 	ctx.Close(true)
 	exec.cleanCtx.Close(false)
+	return addr2idx
 }
 
 // Read accounts' information in parallel, while checking accouts' existence and signatures' validity
@@ -166,7 +167,7 @@ func (exec *txEngine) parallelReadAccounts(minGasPrice uint64) (infoList []*prep
 			accounts:    make([]common.Address, 0, estimatedSize),
 			changed:     false,
 			totalGasFee: uint256.NewInt(),
-			addr2nonce:  make(map[common.Address]uint64),
+			addr2nonce:  make(map[common.Address]uint64, estimatedSize),
 		}
 		for {
 			myIdx := atomic.AddInt64(&sharedIdx, 1)
