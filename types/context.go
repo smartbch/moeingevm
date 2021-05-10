@@ -357,6 +357,12 @@ func (c *Context) GetToAddressCount(addr common.Address) int64 {
 	return c.Db.QueryNotificationCounter(k)
 }
 
+// return the times addr acts as a to-address of a transaction
+func (c *Context) GetFromAddressCount(addr common.Address) int64 {
+	k := append([]byte{modbtypes.FROM_ADDR_KEY}, addr[:]...)
+	return c.Db.QueryNotificationCounter(k)
+}
+
 // return the times addr acts as a to-address of a SEP20 Transfer event at some contract
 func (c *Context) GetSep20ToAddressCount(contract common.Address, addr common.Address) int64 {
 	var zero12 [12]byte
