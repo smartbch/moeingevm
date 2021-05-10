@@ -357,7 +357,7 @@ func (c *Context) GetToAddressCount(addr common.Address) int64 {
 	return c.Db.QueryNotificationCounter(k)
 }
 
-// return the times addr acts as a to-address of a transaction
+// return the times addr acts as a from-address of a transaction
 func (c *Context) GetFromAddressCount(addr common.Address) int64 {
 	k := append([]byte{modbtypes.FROM_ADDR_KEY}, addr[:]...)
 	return c.Db.QueryNotificationCounter(k)
