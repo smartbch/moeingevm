@@ -18,6 +18,7 @@ var (
 	ErrAccountNotExist = errors.New("account does not exist")
 	ErrNonceTooSmall   = errors.New("tx nonce is smaller than the account nonce")
 	ErrNonceTooLarge   = errors.New("tx nonce is larger than the account nonce")
+	ErrTooManyEntries  = errors.New("too many candidicate entries to be returned, please limit the difference between startHeight and endHeight")
 )
 
 type Context struct {
@@ -254,6 +255,10 @@ func (c *Context) BasicQueryLogs(address common.Address, topics []common.Hash, s
 	var rawAddress [20]byte = address
 	rawTopics := FromGethHashes(topics)
 	c.Db.BasicQueryLogs(&rawAddress, rawTopics, startHeight, endHeight, func(data []byte) bool {
+		if data == nil {
+			err = ErrTooManyEntries
+			return false
+		}
 		tx := Transaction{}
 		if _, err = tx.UnmarshalMsg(data); err != nil {
 			return false
@@ -284,6 +289,10 @@ func (c *Context) QueryLogs(addresses []common.Address, topics [][]common.Hash, 
 	}
 
 	c.Db.QueryLogs(rawAddresses, rawTopics, startHeight, endHeight, func(data []byte) bool {
+		if data == nil {
+			err = ErrTooManyEntries
+			return false
+		}
 		tx := Transaction{}
 		if _, err = tx.UnmarshalMsg(data); err != nil {
 			return false
@@ -298,6 +307,10 @@ func (c *Context) QueryLogs(addresses []common.Address, topics [][]common.Hash, 
 
 func (c *Context) QueryTxBySrc(addr common.Address, startHeight, endHeight uint32) (txs []*Transaction, err error) {
 	c.Db.QueryTxBySrc(addr, startHeight, endHeight, func(data []byte) bool {
+		if data == nil {
+			err = ErrTooManyEntries
+			return false
+		}
 		tx := Transaction{}
 		if _, err = tx.UnmarshalMsg(data); err != nil {
 			return false
@@ -312,6 +325,10 @@ func (c *Context) QueryTxBySrc(addr common.Address, startHeight, endHeight uint3
 
 func (c *Context) QueryTxByDst(addr common.Address, startHeight, endHeight uint32) (txs []*Transaction, err error) {
 	c.Db.QueryTxByDst(addr, startHeight, endHeight, func(data []byte) bool {
+		if data == nil {
+			err = ErrTooManyEntries
+			return false
+		}
 		tx := Transaction{}
 		if _, err = tx.UnmarshalMsg(data); err != nil {
 			return false
@@ -326,6 +343,10 @@ func (c *Context) QueryTxByDst(addr common.Address, startHeight, endHeight uint3
 
 func (c *Context) QueryTxByAddr(addr common.Address, startHeight, endHeight uint32) (txs []*Transaction, err error) {
 	c.Db.QueryTxBySrcOrDst(addr, startHeight, endHeight, func(data []byte) bool {
+		if data == nil {
+			err = ErrTooManyEntries
+			return false
+		}
 		tx := Transaction{}
 		if _, err = tx.UnmarshalMsg(data); err != nil {
 			return false
