@@ -251,7 +251,9 @@ func isInTopicSlice(topic [32]byte, topics [][32]byte) bool {
 	return false
 }
 
-func (c *Context) BasicQueryLogs(address common.Address, topics []common.Hash, startHeight, endHeight uint32) (logs []Log, err error) {
+func (c *Context) BasicQueryLogs(address common.Address, topics []common.Hash,
+	startHeight, endHeight, limit uint32) (logs []Log, err error) {
+
 	var rawAddress [20]byte = address
 	rawTopics := FromGethHashes(topics)
 	c.Db.BasicQueryLogs(&rawAddress, rawTopics, startHeight, endHeight, func(data []byte) bool {
@@ -273,6 +275,9 @@ func (c *Context) BasicQueryLogs(address common.Address, topics []common.Hash, s
 			}
 			if hasAll {
 				logs = append(logs, log)
+				if limit > 0 && len(logs) >= int(limit) {
+					return false
+				}
 			}
 		}
 		return true
@@ -305,7 +310,7 @@ func (c *Context) QueryLogs(addresses []common.Address, topics [][]common.Hash, 
 	return
 }
 
-func (c *Context) QueryTxBySrc(addr common.Address, startHeight, endHeight uint32) (txs []*Transaction, err error) {
+func (c *Context) QueryTxBySrc(addr common.Address, startHeight, endHeight, limit uint32) (txs []*Transaction, err error) {
 	c.Db.QueryTxBySrc(addr, startHeight, endHeight, func(data []byte) bool {
 		if data == nil {
 			err = ErrTooManyEntries
@@ -318,12 +323,15 @@ func (c *Context) QueryTxBySrc(addr common.Address, startHeight, endHeight uint3
 		if bytes.Equal(tx.From[:], addr[:]) { // for hash-conflicts corner case
 			txs = append(txs, &tx)
 		}
+		if limit > 0 && len(txs) >= int(limit) {
+			return false
+		}
 		return true
 	})
 	return
 }
 
-func (c *Context) QueryTxByDst(addr common.Address, startHeight, endHeight uint32) (txs []*Transaction, err error) {
+func (c *Context) QueryTxByDst(addr common.Address, startHeight, endHeight, limit uint32) (txs []*Transaction, err error) {
 	c.Db.QueryTxByDst(addr, startHeight, endHeight, func(data []byte) bool {
 		if data == nil {
 			err = ErrTooManyEntries
@@ -336,12 +344,15 @@ func (c *Context) QueryTxByDst(addr common.Address, startHeight, endHeight uint3
 		if bytes.Equal(tx.To[:], addr[:]) { // for hash-conflicts corner case
 			txs = append(txs, &tx)
 		}
+		if limit > 0 && len(txs) >= int(limit) {
+			return false
+		}
 		return true
 	})
 	return
 }
 
-func (c *Context) QueryTxByAddr(addr common.Address, startHeight, endHeight uint32) (txs []*Transaction, err error) {
+func (c *Context) QueryTxByAddr(addr common.Address, startHeight, endHeight, limit uint32) (txs []*Transaction, err error) {
 	c.Db.QueryTxBySrcOrDst(addr, startHeight, endHeight, func(data []byte) bool {
 		if data == nil {
 			err = ErrTooManyEntries
@@ -353,6 +364,9 @@ func (c *Context) QueryTxByAddr(addr common.Address, startHeight, endHeight uint
 		}
 		if bytes.Equal(tx.From[:], addr[:]) || bytes.Equal(tx.To[:], addr[:]) { // for hash-conflicts corner case
 			txs = append(txs, &tx)
+		}
+		if limit > 0 && len(txs) >= int(limit) {
+			return false
 		}
 		return true
 	})
