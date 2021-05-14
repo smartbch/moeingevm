@@ -33,6 +33,11 @@ func call_precompiled_contract(contract_addr *evmc_address,
 	output_size *C.int) {
 	addr := toAddress(contract_addr)
 	contract, ok := vm.PrecompiledContractsIstanbul[addr]
+	if !ok && PredefinedSystemContractExecutor != nil &&
+		PredefinedSystemContractExecutor.IsSystemContract(addr) {
+		contract = PredefinedSystemContractExecutor
+		ok = true
+	}
 	if !ok {
 		*ret_value = 0
 		*out_of_gas = 0
