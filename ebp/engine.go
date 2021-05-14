@@ -396,7 +396,7 @@ func (exec *txEngine) runTxInParallel(txBundle []types.TxToRun, currBlock *types
 			}
 			Runners[myIdx] = &TxRunner{
 				id:  myIdx,
-				Ctx: *exec.cleanCtx.WithRbtCopy(),
+				Ctx: exec.cleanCtx.WithRbtCopy(),
 				Tx:  &txBundle[myIdx],
 			}
 			if myIdx > 0 && txBundle[myIdx-1].From == txBundle[myIdx].From {

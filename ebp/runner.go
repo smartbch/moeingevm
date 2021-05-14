@@ -86,7 +86,7 @@ func getRunner(i int) (runner *TxRunner) {
 
 type TxRunner struct {
 	id        int64
-	Ctx       types.Context
+	Ctx       *types.Context
 	GasUsed   uint64
 	GasRefund uint256.Int
 	Tx        *types.TxToRun
@@ -98,7 +98,7 @@ type TxRunner struct {
 	CreatedContractAddress common.Address
 }
 
-func NewTxRunner(ctx types.Context, tx *types.TxToRun) *TxRunner {
+func NewTxRunner(ctx *types.Context, tx *types.TxToRun) *TxRunner {
 	return &TxRunner{
 		Ctx: ctx,
 		Tx:  tx,
