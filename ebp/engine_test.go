@@ -468,9 +468,7 @@ func closeTestCtx(rootStore *store.RootStore) {
 }
 
 func hexToBytes(s string) []byte {
-	if strings.HasPrefix(s, "0x") {
-		s = s[2:]
-	}
+	s = strings.TrimPrefix(s, "0x")
 	s = strings.TrimSpace(s)
 	s = strings.ReplaceAll(s, "\n", "")
 

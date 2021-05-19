@@ -72,5 +72,5 @@ func call_precompiled_contract(contract_addr *evmc_address,
 	//fmt.Printf("\n");
 	*ret_value = 1
 	*out_of_gas = 0
-	return
+	//return
 }

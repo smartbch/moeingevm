@@ -92,7 +92,7 @@ var IgnoreFiles []string
 func runTestCase(filename string, theCase *tc.TestCase, printLog bool) {
 	ebp.MaxTxGasLimit = math.MaxUint64
 	for _, f := range IgnoreFiles {
-		if strings.Index(filename, f) != -1 {
+		if strings.Contains(filename, f) {
 			fmt.Printf("Ignore File: %s\n", filename)
 			return
 		}
@@ -215,5 +215,5 @@ func StandaloneMain() {
 	} else {
 		fmt.Printf("NOT RUN \n")
 	}
-	return
+	//return
 }

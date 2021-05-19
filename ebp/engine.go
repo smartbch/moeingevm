@@ -238,9 +238,7 @@ func reorderInfoList(infoList []*preparedInfo, reorderSeed int64) (out []*prepar
 		addrList[r0], addrList[r1] = addrList[r1], addrList[r0]
 	}
 	for _, addr := range addrList {
-		for _, info := range addr2Infos[addr] {
-			out = append(out, info)
-		}
+		out = append(out, addr2Infos[addr]...)
 	}
 	return
 }
@@ -336,7 +334,7 @@ func (exec *txEngine) Execute(currBlock *types.BlockInfo) {
 	}
 	exec.setStandbyQueueRange(txRange.start, txRange.end)
 	exec.collectCommittableTxs(committableTxList)
-	return
+	//return
 }
 
 // Get the start and end position of standby queue

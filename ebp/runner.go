@@ -19,10 +19,10 @@ import (
 import "C"
 
 type (
+	//bytes_info               = C.struct_bytes_info
 	evmc_address             = C.struct_evmc_address
 	evmc_bytes32             = C.struct_evmc_bytes32
 	evmc_result              = C.struct_evmc_result
-	bytes_info               = C.struct_bytes_info
 	changed_account          = C.struct_changed_account
 	changed_creation_counter = C.struct_changed_creation_counter
 	changed_bytecode         = C.struct_changed_bytecode

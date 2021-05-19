@@ -31,10 +31,10 @@ int64_t zero_depth_call_wrap(evmc_bytes32 gas_price,
 */
 import "C"
 
+//type bytes_info = C.struct_bytes_info
 type evmc_address = C.struct_evmc_address
 type evmc_bytes32 = C.struct_evmc_bytes32
 type evmc_result = C.struct_evmc_result
-type bytes_info = C.struct_bytes_info
 type changed_account = C.struct_changed_account
 type changed_creation_counter = C.struct_changed_creation_counter
 type changed_bytecode = C.struct_changed_bytecode
@@ -341,14 +341,14 @@ func collect_result(handler C.int /*not used*/, result *all_changed, ret_value *
 // ============================================================
 
 const (
-	NORMAL       = 0
+	//NORMAL       = 0
 	ESTIMATE_GAS = 1
 	CHECK_GAS    = 2
 )
 
-func runTestCase(filename string, theCase *tc.TestCase, printLog bool) {
-	runTestCaseWithGasLimit(filename, theCase, printLog, -1, 0)
-}
+//func runTestCase(filename string, theCase *tc.TestCase, printLog bool) {
+//	runTestCaseWithGasLimit(filename, theCase, printLog, -1, 0)
+//}
 
 func runTestCaseDual(filename string, theCase *tc.TestCase, printLog bool) {
 	copiedCase := &tc.TestCase{
@@ -469,5 +469,5 @@ func main() {
 	} else {
 		fmt.Printf("NOT RUN \n")
 	}
-	return
+	//return
 }

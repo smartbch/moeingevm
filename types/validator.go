@@ -15,8 +15,8 @@ import (
 type BondStatus uint64
 
 const (
-	unbonded = 0x00
-	bonded   = 0x01
+	//unbonded = 0x00
+	//bonded   = 0x01
 
 	BondStatusUnbonded = "Unbonded"
 	BondStatusBonded   = "Bonded"

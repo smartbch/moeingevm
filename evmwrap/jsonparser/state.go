@@ -45,6 +45,7 @@ type btJSON struct {
 
 //go:generate gencodec -type stTransaction -field-override stTransactionMarshaling -out gen_sttransaction.go
 
+//nolint:unused
 type stTransaction struct {
 	Nonce    uint64   `json:"nonce"`
 	To       string   `json:"to"`

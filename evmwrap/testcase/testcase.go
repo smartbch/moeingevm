@@ -28,25 +28,25 @@ import (
 */
 import "C"
 
-type evmc_address = C.struct_evmc_address
-type evmc_bytes32 = C.struct_evmc_bytes32
-type added_log = C.struct_added_log
+//type evmc_address = C.struct_evmc_address
+//type evmc_bytes32 = C.struct_evmc_bytes32
+//type added_log = C.struct_added_log
 
-func toArr20(addr *evmc_address) [20]byte {
-	var arr [20]byte
-	for i := range arr {
-		arr[i] = byte(addr.bytes[i])
-	}
-	return arr
-}
+//func toArr20(addr *evmc_address) [20]byte {
+//	var arr [20]byte
+//	for i := range arr {
+//		arr[i] = byte(addr.bytes[i])
+//	}
+//	return arr
+//}
 
-func toArr32(addr *evmc_bytes32) [32]byte {
-	var arr [32]byte
-	for i := 0; i < 32; i++ {
-		arr[i] = byte(addr.bytes[i])
-	}
-	return arr
-}
+//func toArr32(addr *evmc_bytes32) [32]byte {
+//	var arr [32]byte
+//	for i := 0; i < 32; i++ {
+//		arr[i] = byte(addr.bytes[i])
+//	}
+//	return arr
+//}
 
 func isAllZero(bz []byte) bool {
 	for _, b := range bz {

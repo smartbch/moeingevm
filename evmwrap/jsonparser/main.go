@@ -103,18 +103,18 @@ func ReadJSONFile(fn string, value interface{}) error {
 	return nil
 }
 
-func printSender(testCase *BlockTest) {
-	config := tests.Forks[testCase.Json.Network]
-	for _, block := range testCase.Json.Blocks {
-		decodeBlk, _ := block.decode()
-		txs := decodeBlk.Transactions()
-		for _, tx := range txs {
-			signer := types.MakeSigner(config, block.Header.Number)
-			from, _ := types.Sender(signer, tx)
-			fmt.Printf("Sender: %s\n", strings.ToLower(from.String()))
-		}
-	}
-}
+//func printSender(testCase *BlockTest) {
+//	config := tests.Forks[testCase.Json.Network]
+//	for _, block := range testCase.Json.Blocks {
+//		decodeBlk, _ := block.decode()
+//		txs := decodeBlk.Transactions()
+//		for _, tx := range txs {
+//			signer := types.MakeSigner(config, block.Header.Number)
+//			from, _ := types.Sender(signer, tx)
+//			fmt.Printf("Sender: %s\n", strings.ToLower(from.String()))
+//		}
+//	}
+//}
 
 /*
 type GenesisAlloc map[common.Address]GenesisAccount
