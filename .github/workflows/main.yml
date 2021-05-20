@@ -5,9 +5,9 @@ name: CI
 on:
   # Triggers the workflow on push or pull request events but only for the main branch
   push:
-    branches: [ ci ]
+    branches: [ main ]
   pull_request:
-    branches: [ ci ]
+    branches: [ main ]
 
 jobs:
   test:
@@ -70,6 +70,7 @@ jobs:
           export EVMWRAP=$PWD/moeingevm/evmwrap/host_bridge/libevmwrap.so
           cd moeingevm
           go build -tags cppbtree ./...
+          go test -tags cppbtree ./...
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.40.1
           /home/runner/go/bin/golangci-lint run
 
