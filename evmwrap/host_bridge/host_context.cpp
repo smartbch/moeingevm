@@ -712,7 +712,7 @@ evmc_result evmc_host_context::run_precompiled_contract_sep101() {
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	uint32_t selector = get_selector(msg.input_data);
-	int offset_ptr_count = (selector == SELECTOR_SEP101_GET)? 1 : 2;
+	size_t offset_ptr_count = (selector == SELECTOR_SEP101_GET)? 1 : 2;
 	if(msg.input_size < 4 + offset_ptr_count*(32/*offset word*/+32/*length word*/) ||
 	   msg.input_size > 4 + 32*4 + MAX_KEY_SIZE + MAX_VALUE_SIZE) {
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
