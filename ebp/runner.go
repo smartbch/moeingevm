@@ -44,6 +44,8 @@ const (
 	RpcRunnersIdStart int = 10000
 	RpcRunnersCount   int = 256
 	SMALL_BUF_SIZE    int = int(C.SMALL_BUF_SIZE)
+
+	AdjustGasUsed = false
 )
 
 // Its usage is similar with Runners. Runners are for transactions in block. RpcRunners are for transactions
@@ -238,6 +240,13 @@ func (runner *TxRunner) refundGasFee(ret_value *evmc_result, refund C.uint64_t) 
 		return
 	}
 	gasUsed := runner.Tx.Gas - uint64(ret_value.gas_left)
+	if AdjustGasUsed {
+		if gasUsed * 4 < runner.Tx.Gas {
+			gasUsed = runner.Tx.Gas
+		} else if gasUsed * 2 < runner.Tx.Gas {
+			gasUsed = (runner.Tx.Gas + gasUsed)/2
+		}
+	}
 	//fmt.Printf("runner.Tx.Gas %d uint64(ret_value.gas_left) %d\n", runner.Tx.Gas, uint64(ret_value.gas_left))
 	half := (gasUsed + 1) / 2
 	if gasUsed < uint64(refund)+half {
