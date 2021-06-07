@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/holiman/uint256"
 
@@ -374,7 +375,11 @@ func (c *Context) QueryTxByAddr(addr common.Address, startHeight, endHeight, lim
 }
 
 func (c *Context) GetTxListByHeight(height uint32) (txs []*Transaction, err error) {
-	txContents := c.Db.GetTxListByHeight(int64(height))
+	return c.GetTxListByHeightWithRange(height, 0, math.MaxInt32)
+}
+
+func (c *Context) GetTxListByHeightWithRange(height uint32, start, end int) (txs []*Transaction, err error) {
+	txContents := c.Db.GetTxListByHeightWithRange(int64(height), start, end)
 	txs = make([]*Transaction, len(txContents))
 	for i, txContent := range txContents {
 		txs[i] = &Transaction{}
