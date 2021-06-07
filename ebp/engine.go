@@ -117,8 +117,8 @@ func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice uint64) (touchedAdd
 	warmUpLen := len(reorderedList)/exec.parallelNum + 1
 	parallelRun(exec.parallelNum, func(idx int) {
 		entry := ctxAA[idx]
-		for i := idx * warmUpLen; i < (idx+1) * warmUpLen && i < len(reorderedList); i++ {
-			k := types.GetStandbyTxKey(queueEnd+uint64(i))
+		for i := idx * warmUpLen; i < (idx+1)*warmUpLen && i < len(reorderedList); i++ {
+			k := types.GetStandbyTxKey(queueEnd + uint64(i))
 			entry.ctx.Rbt.PrepareForUpdate(k)
 		}
 		for _, addr := range entry.accounts {
@@ -408,9 +408,9 @@ func (exec *txEngine) runTxInParallel(txRange *TxRange, txBundle []types.TxToRun
 				Ctx: exec.cleanCtx.WithRbtCopy(),
 				Tx:  &txBundle[myIdx],
 			}
-			k := types.GetStandbyTxKey(txRange.start+uint64(myIdx))
+			k := types.GetStandbyTxKey(txRange.start + uint64(myIdx))
 			Runners[myIdx].Ctx.Rbt.Delete(k) // remove it from the standby queue
-			k = types.GetStandbyTxKey(txRange.end+uint64(myIdx))
+			k = types.GetStandbyTxKey(txRange.end + uint64(myIdx))
 			Runners[myIdx].Ctx.Rbt.PrepareForUpdate(k) //warmup
 			if myIdx > 0 && txBundle[myIdx-1].From == txBundle[myIdx].From {
 				// same from-address as previous transaction, cannot run
@@ -428,6 +428,7 @@ type indexAndBool struct {
 	idx       int
 	canCommit bool
 }
+
 // Check interdependency of TXs using 'touchedSet'. The ones with dependency with former committed TXs cannot
 // be committed and should be inserted back into the standby queue.
 // A TX whose nonce is too small should also be inserted back into the standby queue.
