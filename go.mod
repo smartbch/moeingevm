@@ -16,7 +16,7 @@ require (
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/seehuhn/mt19937 v1.0.0
 	github.com/shirou/gopsutil v3.21.3+incompatible // indirect
-	github.com/smartbch/moeingads v0.1.2-0.20210522145456-08ef94887390
+	github.com/smartbch/moeingads v0.1.3-0.20210611032947-187e78789b94
 	github.com/smartbch/moeingdb v0.1.3-0.20210608032006-26e747085c42
 	github.com/stretchr/testify v1.7.0
 	github.com/tendermint/tendermint v0.34.10
