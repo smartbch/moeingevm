@@ -71,7 +71,7 @@ func UpdateWorldState(world *tc.WorldState, key, value []byte) {
 		skey := tc.StorageKey{AccountSeq: binary.BigEndian.Uint64(key[1:9])}
 		copy(skey.Key[:], key[9:])
 		world.Values[skey] = append([]byte{}, value...)
-	} else if bytes.Equal(types.StandbyTxQueueKey, key) {
+	} else if bytes.Equal(types.StandbyTxQueueKey[:], key) {
 		//Is OK
 	} else if bytes.Equal([]byte{types.CURR_BLOCK_KEY}, key) {
 		//Is OK
@@ -150,15 +150,17 @@ func runTestCase(filename string, theCase *tc.TestCase, printLog bool) {
 	world = &newWorld
 	iter := mads.Iterator(GuardStartPlus1, GuardEnd)
 	defer iter.Close()
-	for iter.Valid() {
+	for ; iter.Valid(); iter.Next() {
 		key := iter.Key()
 		value := iter.Value()
+		if bytes.Equal(key, types.StandbyTxQueueKey[:]) {
+			continue
+		}
 		if len(key) != 8 {
 			panic(fmt.Sprintf("Strange Key %v", key))
 		}
 		cv := rabbit.BytesToCachedValue(value)
 		UpdateWorldState(world, cv.GetKey(), cv.GetValue())
-		iter.Next()
 	}
 
 	blockReward.SetUint64(2000000000000000000)

@@ -11,6 +11,7 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/seehuhn/mt19937"
 	"github.com/smartbch/moeingads/store/rabbit"
+	storetypes "github.com/smartbch/moeingads/store/types"
 
 	"github.com/smartbch/moeingevm/types"
 	"github.com/smartbch/moeingevm/utils"
@@ -90,6 +91,7 @@ func (exec *txEngine) SetContext(ctx *types.Context) {
 
 // Check transactions' signatures and insert the valid ones into standby queue
 func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice uint64) (touchedAddrs map[common.Address]int) {
+	exec.cleanCtx.Rbt.GetBaseStore().PrepareForUpdate(types.StandbyTxQueueKey[:])
 	if len(exec.txList) == 0 {
 		exec.cleanCtx.Close(false)
 		return
@@ -106,7 +108,7 @@ func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice uint64) (touchedAdd
 	}
 	reorderedList, addr2Infos := reorderInfoList(infoList, reorderSeed)
 	ctx := exec.cleanCtx.WithRbtCopy()
-	startEndBz := ctx.Rbt.Get(types.StandbyTxQueueKey)
+	startEndBz := ctx.Rbt.GetBaseStore().Get(types.StandbyTxQueueKey[:])
 	queueEnd := uint64(0)
 	if len(startEndBz) >= 8 {
 		queueEnd = binary.BigEndian.Uint64(startEndBz[8:])
@@ -119,7 +121,7 @@ func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice uint64) (touchedAdd
 		entry := ctxAA[idx]
 		for i := idx * warmUpLen; i < (idx+1)*warmUpLen && i < len(reorderedList); i++ {
 			k := types.GetStandbyTxKey(queueEnd + uint64(i))
-			entry.ctx.Rbt.PrepareForUpdate(k)
+			entry.ctx.Rbt.GetBaseStore().PrepareForUpdate(k)
 		}
 		for _, addr := range entry.accounts {
 			if addr2idx[addr] != idx {
@@ -161,10 +163,11 @@ func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice uint64) (touchedAdd
 	for i := range ctxAA {
 		_ = AddSystemAccBalance(ctx, ctxAA[i].totalGasFee)
 	}
-	exec.insertToStandbyTxQ(ctx, reorderedList, startEndBz, queueEnd)
+	trunk := ctx.Rbt.GetBaseStore()
+	ctx.Close(true)
+	exec.insertToStandbyTxQ(trunk, reorderedList, startEndBz, queueEnd)
 	exec.txList = exec.txList[:0] // clear txList after consumption
 	//write ctx state to trunk
-	ctx.Close(true)
 	exec.cleanCtx.Close(false)
 	return addr2idx
 }
@@ -260,19 +263,20 @@ func reorderInfoList(infoList []*preparedInfo, reorderSeed int64) (out []*prepar
 }
 
 // insert valid transactions into standby queue
-func (exec *txEngine) insertToStandbyTxQ(ctx *types.Context, infoList []*preparedInfo, startEnd []byte, end uint64) {
-	rbt := ctx.Rbt
-	for _, info := range infoList {
-		if !info.valid {
-			exec.recordInvalidTx(info)
-			continue
+func (exec *txEngine) insertToStandbyTxQ(trunk storetypes.BaseStoreI, infoList []*preparedInfo, startEnd []byte, end uint64) {
+	trunk.Update(func(store storetypes.SetDeleter) {
+		for _, info := range infoList {
+			if !info.valid {
+				exec.recordInvalidTx(info)
+				continue
+			}
+			k := types.GetStandbyTxKey(end)
+			store.Set(k, info.txBytes)
+			end++
 		}
-		k := types.GetStandbyTxKey(end)
-		rbt.Set(k, info.txBytes)
-		end++
-	}
-	binary.BigEndian.PutUint64(startEnd[8:], end)
-	rbt.Set(types.StandbyTxQueueKey, startEnd) //update start&end pointers of standby queue
+		binary.BigEndian.PutUint64(startEnd[8:], end)
+		store.Set(types.StandbyTxQueueKey[:], startEnd) //update start&end pointers of standby queue
+	})
 }
 
 func (exec *txEngine) recordInvalidTx(info *preparedInfo) {
@@ -350,7 +354,7 @@ func (exec *txEngine) Execute(currBlock *types.BlockInfo) {
 func (exec *txEngine) getStandbyQueueRange() (start, end uint64) {
 	ctx := exec.cleanCtx.WithRbtCopy()
 	defer ctx.Close(false)
-	startEnd := ctx.Rbt.Get(types.StandbyTxQueueKey)
+	startEnd := ctx.Rbt.GetBaseStore().Get(types.StandbyTxQueueKey[:])
 	if startEnd == nil {
 		return 0, 0
 	}
@@ -359,12 +363,13 @@ func (exec *txEngine) getStandbyQueueRange() (start, end uint64) {
 
 // Set the start and end position of standby queue
 func (exec *txEngine) setStandbyQueueRange(start, end uint64) {
-	ctx := exec.cleanCtx.WithRbtCopy()
 	startEnd := make([]byte, 16)
 	binary.BigEndian.PutUint64(startEnd[:8], start)
 	binary.BigEndian.PutUint64(startEnd[8:], end)
-	ctx.Rbt.Set(types.StandbyTxQueueKey, startEnd)
-	ctx.Close(true)
+	trunk := exec.cleanCtx.Rbt.GetBaseStore()
+	trunk.Update(func(store storetypes.SetDeleter) {
+		store.Set(types.StandbyTxQueueKey[:], startEnd)
+	})
 }
 
 var T1, T2, T3, T4 uint64
@@ -387,7 +392,7 @@ func (exec *txEngine) loadStandbyTxs(txRange *TxRange) (txBundle []types.TxToRun
 	txBundle = make([]types.TxToRun, end-txRange.start)
 	for i := txRange.start; i < end; i++ {
 		k := types.GetStandbyTxKey(i)
-		bz := ctx.Rbt.Get(k)
+		bz := ctx.Rbt.GetBaseStore().Get(k)
 		txBundle[i-txRange.start].FromBytes(bz)
 	}
 	ctx.Close(false)
@@ -409,9 +414,9 @@ func (exec *txEngine) runTxInParallel(txRange *TxRange, txBundle []types.TxToRun
 				Tx:  &txBundle[myIdx],
 			}
 			k := types.GetStandbyTxKey(txRange.start + uint64(myIdx))
-			Runners[myIdx].Ctx.Rbt.Delete(k) // remove it from the standby queue
+			Runners[myIdx].Ctx.Rbt.GetBaseStore().PrepareForDeletion(k) // remove it from the standby queue
 			k = types.GetStandbyTxKey(txRange.end + uint64(myIdx))
-			Runners[myIdx].Ctx.Rbt.PrepareForUpdate(k) //warmup
+			Runners[myIdx].Ctx.Rbt.GetBaseStore().PrepareForUpdate(k) //warmup
 			if myIdx > 0 && txBundle[myIdx-1].From == txBundle[myIdx].From {
 				// same from-address as previous transaction, cannot run
 				Runners[myIdx].Status = types.TX_NONCE_TOO_LARGE
@@ -473,22 +478,25 @@ func (exec *txEngine) checkTxDepsAndUptStandbyQ(txRange *TxRange, txBundle []typ
 	idxChan <- indexAndBool{-1, false}
 	wg.Wait()
 
-	ctx := exec.cleanCtx.WithRbtCopy()
-	txRange.start += uint64(len(txBundle))
-	for idx, tx := range txBundle {
-		status := Runners[idx].Status
-		if status == types.FAILED_TO_COMMIT || status == types.TX_NONCE_TOO_LARGE {
-			newK := types.GetStandbyTxKey(txRange.end)
-			txRange.end++
-			ctx.Rbt.Set(newK, tx.ToBytes()) // insert the failed TXs back into standby queue
-			Runners[idx] = nil
-		} else if status == types.ACCOUNT_NOT_EXIST || status == types.TX_NONCE_TOO_SMALL {
-			//collect invalid tx`s all gas
-			exec.cumulativeGasUsed += Runners[idx].Tx.Gas
-			Runners[idx] = nil
+	trunk := exec.cleanCtx.Rbt.GetBaseStore()
+	trunk.Update(func(store storetypes.SetDeleter) {
+		for idx, tx := range txBundle {
+			status := Runners[idx].Status
+			k := types.GetStandbyTxKey(txRange.start)
+			txRange.start++
+			store.Delete(k)
+			if status == types.FAILED_TO_COMMIT || status == types.TX_NONCE_TOO_LARGE {
+				newK := types.GetStandbyTxKey(txRange.end)
+				txRange.end++
+				store.Set(newK, tx.ToBytes()) // insert the failed TXs back into standby queue
+				Runners[idx] = nil
+			} else if status == types.ACCOUNT_NOT_EXIST || status == types.TX_NONCE_TOO_SMALL {
+				//collect invalid tx`s all gas
+				exec.cumulativeGasUsed += Runners[idx].Tx.Gas
+				Runners[idx] = nil
+			}
 		}
-	}
-	ctx.Close(true)
+	})
 }
 
 // Fill 'exec.committedTxs' with 'committableTxList'
