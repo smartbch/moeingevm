@@ -287,7 +287,10 @@ func (c *Context) BasicQueryLogs(address common.Address, topics []common.Hash,
 	return
 }
 
-func (c *Context) QueryLogs(addresses []common.Address, topics [][]common.Hash, startHeight, endHeight uint32) (logs []Log, err error) {
+
+type FilterFunc func(addr common.Address, topics []common.Hash, addrList []common.Address, topicsList [][]common.Hash) (ok bool)
+
+func (c *Context) QueryLogs(addresses []common.Address, topics [][]common.Hash, startHeight, endHeight uint32, filter FilterFunc) (logs []Log, err error) {
 	rawAddresses := FromGethAddreses(addresses)
 	rawTopics := make([][][32]byte, len(topics))
 	for i, t := range topics {
@@ -304,7 +307,15 @@ func (c *Context) QueryLogs(addresses []common.Address, topics [][]common.Hash, 
 			return false
 		}
 
-		logs = append(logs, tx.Logs...)
+		var topicArr [4]common.Hash
+		for _, log := range tx.Logs {
+			for i, topic := range log.Topics {
+				topicArr[i] = common.Hash(topic)
+			}
+			if filter(common.Address(log.Address), topicArr[:len(log.Topics)], addresses, topics) {
+				logs = append(logs, log)
+			}
+		}
 		return true
 	})
 
