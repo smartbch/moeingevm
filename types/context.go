@@ -267,12 +267,12 @@ func (c *Context) BasicQueryLogs(address common.Address, topics []common.Hash,
 			return false
 		}
 		for _, log := range tx.Logs {
-			hasAll := true
+			hasAll := rawAddress == log.Address
 			for _, t := range topics {
-				if !isInTopicSlice(t, log.Topics) {
-					hasAll = false
+				if !hasAll {
 					break
 				}
+				hasAll = hasAll && isInTopicSlice(t, log.Topics)
 			}
 			if hasAll {
 				logs = append(logs, log)

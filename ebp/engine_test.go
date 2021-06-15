@@ -37,7 +37,7 @@ func prepareTruck() (*store.TrunkStore, *store.RootStore) {
 	root := store.NewRootStore(mads, nil)
 	height := int64(1)
 	root.SetHeight(height)
-	return root.GetTrunkStore().(*store.TrunkStore), root
+	return root.GetTrunkStore(1000).(*store.TrunkStore), root
 }
 
 func prepareCtx(t *store.TrunkStore) *types.Context {
@@ -200,8 +200,8 @@ func TestRandomTxExecuteConsistent(t *testing.T) {
 	defer closeTestCtx(root)
 	randomTxs := generateRandomTx(&testcase.DumbSigner{})
 	for i := 100; i > 0; i-- {
-		r1 := executeTxs(randomTxs, root.GetTrunkStore().(*store.TrunkStore))
-		r2 := executeTxs(randomTxs, root.GetTrunkStore().(*store.TrunkStore))
+		r1 := executeTxs(randomTxs, root.GetTrunkStore(1000).(*store.TrunkStore))
+		r2 := executeTxs(randomTxs, root.GetTrunkStore(1000).(*store.TrunkStore))
 		//check txs
 		require.Equal(t, len(r1.standbyTxs), len(r2.standbyTxs))
 		for i, tx1 := range r1.standbyTxs {

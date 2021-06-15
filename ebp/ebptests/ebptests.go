@@ -117,7 +117,7 @@ func runTestCase(filename string, theCase *tc.TestCase, printLog bool) {
 	defer root.Close()
 	height := int64(1)
 	root.SetHeight(height)
-	trunk := root.GetTrunkStore().(*store.TrunkStore)
+	trunk := root.GetTrunkStore(1000).(*store.TrunkStore)
 	rbt := rabbit.NewRabbitStore(trunk)
 	WriteWorldStateToRabbit(rbt, world)
 	rbt.Close()
@@ -126,7 +126,7 @@ func runTestCase(filename string, theCase *tc.TestCase, printLog bool) {
 
 	// execute currTx
 	currTx := currBlock.TxList[0].ToEthTx()
-	trunk = root.GetTrunkStore().(*store.TrunkStore)
+	trunk = root.GetTrunkStore(1000).(*store.TrunkStore)
 	var chainId big.Int
 	chainId.SetBytes(currBlock.ChainId[:])
 	txEngine := ebp.NewEbpTxExec(10, 100, 32, 100, &tc.DumbSigner{})
