@@ -148,20 +148,16 @@ func runTestCase(filename string, theCase *tc.TestCase, printLog bool) {
 	// create new tc.WorldState according to MoeingADS
 	newWorld := tc.NewWorldState()
 	world = &newWorld
-	iter := mads.Iterator(GuardStartPlus1, GuardEnd)
-	defer iter.Close()
-	for ; iter.Valid(); iter.Next() {
-		key := iter.Key()
-		value := iter.Value()
+	mads.ScanAll(func(key, value []byte) {
 		if bytes.Equal(key, types.StandbyTxQueueKey[:]) {
-			continue
+			return
 		}
 		if len(key) != 8 {
 			panic(fmt.Sprintf("Strange Key %v", key))
 		}
 		cv := rabbit.BytesToCachedValue(value)
 		UpdateWorldState(world, cv.GetKey(), cv.GetValue())
-	}
+	})
 
 	blockReward.SetUint64(2000000000000000000)
 	blockReward.Add(blockReward, &gasFee)
