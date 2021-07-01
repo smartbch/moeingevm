@@ -3,14 +3,11 @@ package types
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"math"
 
 	"github.com/holiman/uint256"
 
 	"github.com/ethereum/go-ethereum/common"
-	gethrpc "github.com/ethereum/go-ethereum/rpc"
-
 	"github.com/smartbch/moeingads/store/rabbit"
 	modbtypes "github.com/smartbch/moeingdb/types"
 )
@@ -197,11 +194,7 @@ func (c *Context) GetBlockByHash(hash common.Hash) (blk *Block, err error) {
 	return
 }
 
-func (c *Context) GetBalance(owner common.Address, height int64) (*uint256.Int, error) {
-	if height != int64(gethrpc.LatestBlockNumber) {
-		return nil, fmt.Errorf("TODO: GetBalance(), h=%d", height)
-	}
-
+func (c *Context) GetBalance(owner common.Address) (*uint256.Int, error) {
 	if acc := c.GetAccount(owner); acc != nil {
 		return acc.Balance(), nil
 	}
@@ -286,7 +279,6 @@ func (c *Context) BasicQueryLogs(address common.Address, topics []common.Hash,
 
 	return
 }
-
 
 type FilterFunc func(addr common.Address, topics []common.Hash, addrList []common.Address, topicsList [][]common.Hash) (ok bool)
 

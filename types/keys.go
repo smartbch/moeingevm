@@ -24,7 +24,7 @@ const BYTECODE_KEY byte = 25
 const VALUE_KEY byte = 27
 const CURR_BLOCK_KEY byte = 29
 
-var StandbyTxQueueKey [8]byte = [8]byte{255,255,255,255, 255,255,255,0}
+var StandbyTxQueueKey [8]byte = [8]byte{255, 255, 255, 255, 255, 255, 255, 0}
 
 const TOO_OLD_THRESHOLD uint64 = 10
 
@@ -65,7 +65,7 @@ func GetValueKey(seq uint64, key string) []byte {
 
 func GetStandbyTxKey(num uint64) []byte {
 	var buf [8]byte
-	num += uint64(128+64)<<56 // raise it to the non-rabbit range
+	num += uint64(128+64) << 56 // raise it to the non-rabbit range
 	binary.BigEndian.PutUint64(buf[:], num)
 	return buf[:]
 }
