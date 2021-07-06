@@ -92,7 +92,7 @@ func TestTxEngine_DifferentAccount(t *testing.T) {
 	for _, tx := range txs {
 		e.CollectTx(tx)
 	}
-	e.Prepare(0, 0)
+	e.Prepare(0, 0, DefaultTxGasLimit)
 	e.SetContext(prepareCtx(trunk))
 	startKey, endKey := e.getStandbyQueueRange()
 	txsStandby := e.loadStandbyTxs(&TxRange{
@@ -145,7 +145,7 @@ func TestTxEngine_SameAccount(t *testing.T) {
 	tx6, _ := gethtypes.NewTransaction(2, to1, big.NewInt(104), 100000, big.NewInt(1), nil).WithSignature(e.signer, from1.Bytes())
 	e.CollectTx(tx6)
 
-	e.Prepare(0, 0)
+	e.Prepare(0, 0, DefaultTxGasLimit)
 	e.SetContext(prepareCtx(trunk))
 	startKey, endKey := e.getStandbyQueueRange()
 	txsStandby := e.loadStandbyTxs(&TxRange{
@@ -259,7 +259,7 @@ func executeTxs(randomTxs []*gethtypes.Transaction, trunk *store.TrunkStore) exe
 	for _, tx := range randomTxs {
 		e.CollectTx(tx)
 	}
-	e.Prepare(0, 0)
+	e.Prepare(0, 0, DefaultTxGasLimit)
 	startKey, endKey := e.getStandbyQueueRange()
 	standbyTxs := e.loadStandbyTxs(&TxRange{
 		start: startKey,
@@ -295,7 +295,7 @@ func TestEmptyTxs(t *testing.T) {
 	e := NewEbpTxExec(5, 2, 2, 10, &testcase.DumbSigner{})
 	e.SetContext(prepareCtx(trunk))
 	require.Equal(t, 0, e.CollectTxsCount())
-	e.Prepare(0, 0)
+	e.Prepare(0, 0, DefaultTxGasLimit)
 	e.SetContext(prepareCtx(trunk))
 	e.Execute(&types.BlockInfo{})
 	require.Equal(t, 0, len(e.CommittedTxs()))
@@ -314,7 +314,7 @@ func TestTxCountBiggerThanRunnerCount(t *testing.T) {
 		e.CollectTx(tx)
 	}
 	require.Equal(t, 2, e.CollectTxsCount())
-	e.Prepare(0, 0)
+	e.Prepare(0, 0, DefaultTxGasLimit)
 	e.SetContext(prepareCtx(trunk))
 	e.Execute(&types.BlockInfo{})
 	require.Equal(t, 2, len(e.CommittedTxs()))
@@ -335,7 +335,7 @@ func TestAccBalanceNotEnough(t *testing.T) {
 	tx, _ := gethtypes.NewTransaction(1, to1, big.NewInt(20000_0000_0000), 100000, big.NewInt(1), nil).WithSignature(e.signer, from1.Bytes())
 	e.CollectTx(tx)
 	require.Equal(t, 3, e.CollectTxsCount())
-	e.Prepare(0, 0)
+	e.Prepare(0, 0, DefaultTxGasLimit)
 	e.SetContext(prepareCtx(trunk))
 	e.Execute(&types.BlockInfo{})
 	toAcc1 := e.cleanCtx.GetAccount(to1)
@@ -367,7 +367,7 @@ bc221a1460375780636299a6ef146053575b600080fd5b603d607e565b604051
 	tx, _ := gethtypes.NewContractCreation(0, big.NewInt(0), 100000, big.NewInt(1), creationBytecode).WithSignature(e.signer, from1.Bytes())
 	e.CollectTx(tx)
 	e.SetContext(prepareCtx(trunk))
-	e.Prepare(0, 0)
+	e.Prepare(0, 0, DefaultTxGasLimit)
 	e.SetContext(prepareCtx(trunk))
 	e.Execute(&types.BlockInfo{})
 	require.Equal(t, 1, len(e.committedTxs))
@@ -409,7 +409,7 @@ func TestRandomPrepare(t *testing.T) {
 		e.CollectTx(tx9)
 		e.CollectTx(tx10)
 		e.CollectTx(tx11)
-		e.Prepare(0, 0)
+		e.Prepare(0, 0, DefaultTxGasLimit)
 		require.Equal(t, 12*i+12, e.StandbyQLen())
 	}
 }

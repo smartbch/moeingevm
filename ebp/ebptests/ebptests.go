@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"math"
 	"math/big"
 	"os"
 	"os/exec"
@@ -90,7 +89,6 @@ var (
 var IgnoreFiles []string
 
 func runTestCase(filename string, theCase *tc.TestCase, printLog bool) {
-	ebp.MaxTxGasLimit = math.MaxUint64
 	for _, f := range IgnoreFiles {
 		if strings.Contains(filename, f) {
 			fmt.Printf("Ignore File: %s\n", filename)
@@ -135,7 +133,7 @@ func runTestCase(filename string, theCase *tc.TestCase, printLog bool) {
 	ctx = ctx.WithRbt(&rbt)
 	txEngine.SetContext(ctx)
 	txEngine.CollectTx(currTx)
-	txEngine.Prepare(0, 0)
+	txEngine.Prepare(0, 0, ebp.DefaultTxGasLimit)
 	txList := txEngine.CommittedTxs()
 	fmt.Printf("after Prepare txList len %d\n", len(txList))
 	txEngine.Execute(&currBlock.BlockInfo)

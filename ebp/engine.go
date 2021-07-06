@@ -18,9 +18,7 @@ import (
 	"github.com/smartbch/moeingevm/utils"
 )
 
-var (
-	MaxTxGasLimit uint64 = 1000_0000
-)
+const DefaultTxGasLimit uint64 = 1000_0000
 
 var _ TxExecutor = (*txEngine)(nil)
 
@@ -91,13 +89,13 @@ func (exec *txEngine) SetContext(ctx *types.Context) {
 }
 
 // Check transactions' signatures and insert the valid ones into standby queue
-func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice uint64) (touchedAddrs map[common.Address]int) {
+func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice, maxTxGasLimit uint64) (touchedAddrs map[common.Address]int) {
 	exec.cleanCtx.Rbt.GetBaseStore().PrepareForUpdate(types.StandbyTxQueueKey[:])
 	if len(exec.txList) == 0 {
 		exec.cleanCtx.Close(false)
 		return
 	}
-	infoList, ctxAA := exec.parallelReadAccounts(minGasPrice)
+	infoList, ctxAA := exec.parallelReadAccounts(minGasPrice, maxTxGasLimit)
 	addr2idx := make(map[common.Address]int, len(exec.txList)) // map address to ctxAA's index
 	for idx, entry := range ctxAA {
 		for _, addr := range entry.accounts {
@@ -174,7 +172,7 @@ func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice uint64) (touchedAdd
 }
 
 // Read accounts' information in parallel, while checking accouts' existence and signatures' validity
-func (exec *txEngine) parallelReadAccounts(minGasPrice uint64) (infoList []*preparedInfo, ctxAA []*ctxAndAccounts) {
+func (exec *txEngine) parallelReadAccounts(minGasPrice, maxTxGasLimit uint64) (infoList []*preparedInfo, ctxAA []*ctxAndAccounts) {
 	//for each tx, we fetch some info for it
 	infoList = make([]*preparedInfo, len(exec.txList))
 	//the ctx and accounts that a worker works at
@@ -214,7 +212,7 @@ func (exec *txEngine) parallelReadAccounts(minGasPrice uint64) (infoList []*prep
 				infoList[myIdx].statusStr = "invalid gas price"
 				continue // skip invalid tx gas price
 			}
-			if tx.Gas() > MaxTxGasLimit {
+			if tx.Gas() > maxTxGasLimit {
 				infoList[myIdx].valid = false
 				infoList[myIdx].statusStr = "invalid gas limit"
 				continue // skip invalid tx gas limit
