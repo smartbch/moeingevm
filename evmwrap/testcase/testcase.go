@@ -3,6 +3,7 @@ package testcase
 import (
 	"bufio"
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -18,6 +19,8 @@ import (
 	coretypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/holiman/uint256"
+	"github.com/smartbch/moeingads"
+	"github.com/smartbch/moeingads/store/rabbit"
 
 	"github.com/smartbch/moeingevm/types"
 	"github.com/smartbch/moeingevm/utils"
@@ -119,6 +122,61 @@ func NewWorldState() WorldState {
 		Accounts:  make(map[[20]byte]*BasicAccount),
 		Values:    make(map[StorageKey][]byte),
 	}
+}
+
+func GetWorldStateFromMads(mads *moeingads.MoeingADS) *WorldState {
+	world := NewWorldState()
+	mads.ScanAll(func(key, value []byte) {
+		if bytes.Equal(key, types.StandbyTxQueueKey[:]) {
+			return
+		}
+		if len(key) != 8 {
+			panic(fmt.Sprintf("Strange Key %v", key))
+		}
+		cv := rabbit.BytesToCachedValue(value)
+		UpdateWorldState(&world, cv.GetKey(), cv.GetValue())
+	})
+	return &world
+}
+
+func UpdateWorldState(world *WorldState, key, value []byte) {
+	if key[0] == types.CREATION_COUNTER_KEY {
+		world.CreationCounters[int(key[0])] = binary.BigEndian.Uint64(value)
+	} else if key[0] == types.ACCOUNT_KEY {
+		var addr [20]byte
+		copy(addr[:], key[1:])
+		accInfo := types.NewAccountInfo(value)
+		world.Accounts[addr] = &BasicAccount{
+			Sequence: accInfo.Sequence(),
+			Nonce:    accInfo.Nonce(),
+		}
+		world.Accounts[addr].Balance.SetBytes32(accInfo.BalanceSlice())
+	} else if key[0] == types.BYTECODE_KEY {
+		var addr [20]byte
+		copy(addr[:], key[1:])
+		bi := BytecodeInfo{Bytecode: append([]byte{}, value[32:]...)}
+		copy(bi.Codehash[:], key[:32])
+		world.Bytecodes[addr] = bi
+	} else if key[0] == types.VALUE_KEY {
+		skey := StorageKey{AccountSeq: binary.BigEndian.Uint64(key[1:9])}
+		copy(skey.Key[:], key[9:])
+		world.Values[skey] = append([]byte{}, value...)
+	} else if bytes.Equal(types.StandbyTxQueueKey[:], key) {
+		//Is OK
+	} else if bytes.Equal([]byte{types.CURR_BLOCK_KEY}, key) {
+		//Is OK
+	} else {
+		fmt.Printf("Why key %v value %v\n", key, value)
+		panic("Unknown Key")
+	}
+}
+
+func (world WorldState) SumAllBalance() *uint256.Int {
+	res := uint256.NewInt()
+	for _, acc := range world.Accounts {
+		res.Add(res, &acc.Balance)
+	}
+	return res
 }
 
 func (world WorldState) Clone() (out WorldState) {

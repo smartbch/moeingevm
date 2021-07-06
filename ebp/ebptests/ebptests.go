@@ -1,7 +1,6 @@
 package ebptests
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"math/big"
@@ -45,38 +44,6 @@ func WriteWorldStateToRabbit(rbt rabbit.RabbitStore, world *tc.WorldState) {
 	for skey, bz := range world.Values {
 		k := types.GetValueKey(skey.AccountSeq, string(skey.Key[:]))
 		rbt.Set(k, bz)
-	}
-}
-
-func UpdateWorldState(world *tc.WorldState, key, value []byte) {
-	if key[0] == types.CREATION_COUNTER_KEY {
-		world.CreationCounters[int(key[0])] = binary.BigEndian.Uint64(value)
-	} else if key[0] == types.ACCOUNT_KEY {
-		var addr [20]byte
-		copy(addr[:], key[1:])
-		accInfo := types.NewAccountInfo(value)
-		world.Accounts[addr] = &tc.BasicAccount{
-			Sequence: accInfo.Sequence(),
-			Nonce:    accInfo.Nonce(),
-		}
-		world.Accounts[addr].Balance.SetBytes32(accInfo.BalanceSlice())
-	} else if key[0] == types.BYTECODE_KEY {
-		var addr [20]byte
-		copy(addr[:], key[1:])
-		bi := tc.BytecodeInfo{Bytecode: append([]byte{}, value[32:]...)}
-		copy(bi.Codehash[:], key[:32])
-		world.Bytecodes[addr] = bi
-	} else if key[0] == types.VALUE_KEY {
-		skey := tc.StorageKey{AccountSeq: binary.BigEndian.Uint64(key[1:9])}
-		copy(skey.Key[:], key[9:])
-		world.Values[skey] = append([]byte{}, value...)
-	} else if bytes.Equal(types.StandbyTxQueueKey[:], key) {
-		//Is OK
-	} else if bytes.Equal([]byte{types.CURR_BLOCK_KEY}, key) {
-		//Is OK
-	} else {
-		fmt.Printf("Why key %v value %v\n", key, value)
-		panic("Unknown Key")
 	}
 }
 
@@ -143,19 +110,8 @@ func runTestCase(filename string, theCase *tc.TestCase, printLog bool) {
 	gasFee.Mul(uint256.NewInt().SetUint64(txList[0].GasUsed),
 		utils.U256FromSlice32(txList[0].GasPrice[:]))
 
-	// create new tc.WorldState according to MoeingADS
-	newWorld := tc.NewWorldState()
-	world = &newWorld
-	mads.ScanAll(func(key, value []byte) {
-		if bytes.Equal(key, types.StandbyTxQueueKey[:]) {
-			return
-		}
-		if len(key) != 8 {
-			panic(fmt.Sprintf("Strange Key %v", key))
-		}
-		cv := rabbit.BytesToCachedValue(value)
-		UpdateWorldState(world, cv.GetKey(), cv.GetValue())
-	})
+	// create new tc.WorldState according to MoeingADS's content
+	world = tc.GetWorldStateFromMads(mads)
 
 	blockReward.SetUint64(2000000000000000000)
 	blockReward.Add(blockReward, &gasFee)
