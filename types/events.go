@@ -21,3 +21,29 @@ type ChainEvent struct {
 	Logs        []*gethtypes.Log
 	// TODO: define more fields
 }
+
+func BlockToChainEvent(mdbBlock *modbtypes.Block) ChainEvent {
+	return ChainEvent{
+		Hash: mdbBlock.BlockHash,
+		BlockHeader: &Header{
+			Number:    uint64(mdbBlock.Height),
+			BlockHash: mdbBlock.BlockHash,
+		},
+		Block: mdbBlock,
+		Logs:  collectAllGethLogs(mdbBlock),
+	}
+}
+
+func collectAllGethLogs(mdbBlock *modbtypes.Block) []*gethtypes.Log {
+	logs := make([]*gethtypes.Log, 0, 8)
+	for _, mdbTx := range mdbBlock.TxList {
+		for _, mdbLog := range mdbTx.LogList {
+			logs = append(logs, &gethtypes.Log{
+				Address: mdbLog.Address,
+				Topics:  ToGethHashes(mdbLog.Topics),
+			})
+		}
+	}
+	return logs
+}
+
