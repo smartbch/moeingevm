@@ -12,6 +12,7 @@ import (
 	"github.com/seehuhn/mt19937"
 	"github.com/smartbch/moeingads/store/rabbit"
 	storetypes "github.com/smartbch/moeingads/store/types"
+	modbtypes "github.com/smartbch/moeingdb/types"
 
 	"github.com/smartbch/moeingevm/types"
 	"github.com/smartbch/moeingevm/utils"
@@ -566,6 +567,41 @@ func LogsBloom(logs []types.Log) [256]byte {
 
 func (exec *txEngine) CommittedTxs() []*types.Transaction {
 	return exec.committedTxs
+}
+
+func (exec *txEngine) CommittedTxIds() [][32]byte {
+	idList := make([][32]byte, len(exec.committedTxs))
+	for i, tx := range exec.committedTxs {
+		idList[i] = tx.Hash
+	}
+	return idList
+}
+
+func (exec *txEngine) CommittedTxsForMoDB() []modbtypes.Tx {
+	txList := make([]modbtypes.Tx, len(exec.committedTxs))
+	for i, tx := range exec.committedTxs {
+		t := modbtypes.Tx{}
+		copy(t.HashId[:], tx.Hash[:])
+		copy(t.SrcAddr[:], tx.From[:])
+		copy(t.DstAddr[:], tx.To[:])
+		txContent, err := tx.MarshalMsg(nil)
+		if err != nil {
+			panic(err)
+		}
+		t.Content = txContent
+		t.LogList = make([]modbtypes.Log, len(tx.Logs))
+		for j, l := range tx.Logs {
+			copy(t.LogList[j].Address[:], l.Address[:])
+			if len(l.Topics) != 0 {
+				t.LogList[j].Topics = make([][32]byte, len(l.Topics))
+			}
+			for k, topic := range l.Topics {
+				copy(t.LogList[j].Topics[k][:], topic[:])
+			}
+		}
+		txList[i] = t
+	}
+	return txList
 }
 
 func (exec *txEngine) CollectTx(tx *gethtypes.Transaction) {
