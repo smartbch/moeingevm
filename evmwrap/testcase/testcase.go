@@ -133,8 +133,10 @@ func GetWorldStateFromMads(mads *moeingads.MoeingADS) *WorldState {
 		if len(key) != 8 {
 			panic(fmt.Sprintf("Strange Key %v", key))
 		}
-		cv := rabbit.BytesToCachedValue(value)
-		UpdateWorldState(&world, cv.GetKey(), cv.GetValue())
+		if 64 <= key[0] && key[0] < 64+128 { // in the range for rabbit
+			cv := rabbit.BytesToCachedValue(value)
+			UpdateWorldState(&world, cv.GetKey(), cv.GetValue())
+		}
 	})
 	return &world
 }
@@ -161,8 +163,6 @@ func UpdateWorldState(world *WorldState, key, value []byte) {
 		skey := StorageKey{AccountSeq: binary.BigEndian.Uint64(key[1:9])}
 		copy(skey.Key[:], key[9:])
 		world.Values[skey] = append([]byte{}, value...)
-	} else if bytes.Equal(types.StandbyTxQueueKey[:], key) {
-		//Is OK
 	} else if bytes.Equal([]byte{types.CURR_BLOCK_KEY}, key) {
 		//Is OK
 	} else {
