@@ -294,7 +294,7 @@ func TestEmptyTxs(t *testing.T) {
 	defer closeTestCtx(root)
 	e := NewEbpTxExec(5, 2, 2, 10, &testcase.DumbSigner{})
 	e.SetContext(prepareCtx(trunk))
-	require.Equal(t, 0, e.CollectTxsCount())
+	require.Equal(t, 0, e.CollectedTxsCount())
 	e.Prepare(0, 0, DefaultTxGasLimit)
 	e.SetContext(prepareCtx(trunk))
 	e.Execute(&types.BlockInfo{})
@@ -313,7 +313,7 @@ func TestTxCountBiggerThanRunnerCount(t *testing.T) {
 	for _, tx := range txs {
 		e.CollectTx(tx)
 	}
-	require.Equal(t, 2, e.CollectTxsCount())
+	require.Equal(t, 2, e.CollectedTxsCount())
 	e.Prepare(0, 0, DefaultTxGasLimit)
 	e.SetContext(prepareCtx(trunk))
 	e.Execute(&types.BlockInfo{})
@@ -334,7 +334,7 @@ func TestAccBalanceNotEnough(t *testing.T) {
 	}
 	tx, _ := gethtypes.NewTransaction(1, to1, big.NewInt(20000_0000_0000), 100000, big.NewInt(1), nil).WithSignature(e.signer, from1.Bytes())
 	e.CollectTx(tx)
-	require.Equal(t, 3, e.CollectTxsCount())
+	require.Equal(t, 3, e.CollectedTxsCount())
 	e.Prepare(0, 0, DefaultTxGasLimit)
 	e.SetContext(prepareCtx(trunk))
 	e.Execute(&types.BlockInfo{})

@@ -22,7 +22,7 @@ type TxExecutor interface {
 	Context() *types.Context
 
 	//collect infos, not thread safe
-	CollectTxsCount() int
+	CollectedTxsCount() int
 	CommittedTxs() []*types.Transaction
 	CommittedTxIds() [][32]byte
 	CommittedTxsForMoDB() []modbtypes.Tx
