@@ -268,6 +268,10 @@ func (runner *TxRunner) refundGasFee(ret_value *evmc_result, refund C.uint64_t) 
 	runner.GasRefund = returnedGasFee
 	runner.GasUsed = gasUsed
 }
+func (runner *TxRunner) GetGasFee() *uint256.Int {
+	return uint256.NewInt().Mul(uint256.NewInt().SetUint64(runner.GasUsed),
+		uint256.NewInt().SetBytes(runner.Tx.GasPrice[:]))
+}
 
 func convertLog(log *added_log) (res types.EvmLog) {
 	if log.topic1 != nil {

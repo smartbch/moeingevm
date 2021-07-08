@@ -11,6 +11,7 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/seehuhn/mt19937"
 	"github.com/smartbch/moeingads/store/rabbit"
+	dt "github.com/smartbch/moeingads/datatree"
 	storetypes "github.com/smartbch/moeingads/store/types"
 	modbtypes "github.com/smartbch/moeingdb/types"
 
@@ -114,7 +115,7 @@ func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice, maxTxGasLimit uint
 	}
 	ctx.Close(false)
 	warmUpLen := len(reorderedList)/exec.parallelNum + 1
-	parallelRun(exec.parallelNum, func(idx int) {
+	dt.ParallelRun(exec.parallelNum, func(idx int) {
 		entry := ctxAA[idx]
 		for i := idx * warmUpLen; i < (idx+1)*warmUpLen && i < len(reorderedList); i++ {
 			k := types.GetStandbyTxKey(queueEnd + uint64(i)) // warm up the entry in standby queue
@@ -178,7 +179,7 @@ func (exec *txEngine) parallelReadAccounts(minGasPrice, maxTxGasLimit uint64) (i
 	ctxAA = make([]*ctxAndAccounts, exec.parallelNum)
 	sharedIdx := int64(-1)
 	estimatedSize := len(exec.txList)/exec.parallelNum + 1
-	parallelRun(exec.parallelNum, func(workerId int) {
+	dt.ParallelRun(exec.parallelNum, func(workerId int) {
 		ctxAA[workerId] = &ctxAndAccounts{
 			ctx:         exec.cleanCtx.WithRbtCopy(),
 			accounts:    make([]common.Address, 0, estimatedSize),
@@ -255,6 +256,9 @@ func reorderInfoList(infoList []*preparedInfo, reorderSeed int64) (out []*prepar
 func (exec *txEngine) insertToStandbyTxQ(trunk storetypes.BaseStoreI, infoList []*preparedInfo, startEnd []byte, end uint64) {
 	trunk.Update(func(store storetypes.SetDeleter) {
 		for _, info := range infoList {
+			// six kinds of errors: invalid signature; incorrect nonce; 
+			// no such account; balance not enough; gas limit too high; gas price too low;
+			// if the proposor is honest, there should be no these kinds of errors.
 			if len(info.errorStr) != 0 {
 				exec.recordInvalidTx(info)
 				continue
@@ -295,8 +299,8 @@ func (exec *txEngine) recordInvalidTx(info *preparedInfo) {
 func (exec *txEngine) Execute(currBlock *types.BlockInfo) {
 	exec.committedTxs = exec.committedTxs[:0]
 	exec.cumulativeGasUsed = 0
-	exec.cumulativeGasRefund = uint256.NewInt().SetUint64(0)
-	exec.cumulativeGasFee = uint256.NewInt().SetUint64(0)
+	exec.cumulativeGasRefund = uint256.NewInt()
+	exec.cumulativeGasFee = uint256.NewInt()
 	exec.currentBlock = currBlock
 	startKey, endKey := exec.getStandbyQueueRange()
 	if startKey == endKey {
@@ -306,10 +310,10 @@ func (exec *txEngine) Execute(currBlock *types.BlockInfo) {
 		start: startKey,
 		end:   endKey,
 	}
-	committableTxList := make([]*TxRunner, 0, 4096)
+	committableRunnerList := make([]*TxRunner, 0, 4096)
 	// Repeat exec.roundNum round for execute txs in standby q. At the end of each round
-	// modifications made by TXs are written to world state. So TXs in later rounds will
-	// be affected by the modifications made by TXs in earlier rounds.
+	// modifications made by TXs are written to world state. So TXs in later rounds can
+	// see the modifications made by TXs in earlier rounds.
 	for i := 0; i < exec.roundNum; i++ {
 		if txRange.start == txRange.end {
 			break
@@ -317,14 +321,14 @@ func (exec *txEngine) Execute(currBlock *types.BlockInfo) {
 		numTx := exec.executeOneRound(txRange, exec.currentBlock)
 		for i := 0; i < numTx; i++ {
 			if Runners[i] == nil {
-				continue
+				continue // the TX is not committable and needs re-execution
 			}
-			committableTxList = append(committableTxList, Runners[i])
+			committableRunnerList = append(committableRunnerList, Runners[i])
 			Runners[i] = nil
 		}
 	}
 	exec.setStandbyQueueRange(txRange.start, txRange.end)
-	exec.collectCommittableTxs(committableTxList)
+	exec.collectCommittableTxs(committableRunnerList)
 }
 
 // Get the start and end position of standby queue
@@ -361,7 +365,7 @@ func (exec *txEngine) executeOneRound(txRange *TxRange, currBlock *types.BlockIn
 func (exec *txEngine) loadStandbyTxs(txRange *TxRange) (txBundle []types.TxToRun) {
 	ctx := exec.cleanCtx.WithRbtCopy()
 	end := txRange.end
-	if end > txRange.start+uint64(exec.runnerNumber) {
+	if end > txRange.start+uint64(exec.runnerNumber) { // load at most exec.runnerNumber
 		end = txRange.start + uint64(exec.runnerNumber)
 	}
 	txBundle = make([]types.TxToRun, end-txRange.start)
@@ -374,10 +378,11 @@ func (exec *txEngine) loadStandbyTxs(txRange *TxRange) (txBundle []types.TxToRun
 	return
 }
 
-// Assign the transactions to global 'Runners' and run them in parallel
+// Assign the transactions to global 'Runners' and run them in parallel.
+// Record the count of touched KV pairs and return it as a hint for checkTxDepsAndUptStandbyQ
 func (exec *txEngine) runTxInParallel(txRange *TxRange, txBundle []types.TxToRun, currBlock *types.BlockInfo) (kvCount int64) {
 	sharedIdx := int64(-1)
-	parallelRun(exec.parallelNum, func(_ int) {
+	dt.ParallelRun(exec.parallelNum, func(_ int) {
 		for {
 			myIdx := atomic.AddInt64(&sharedIdx, 1)
 			if myIdx >= int64(len(txBundle)) {
@@ -391,9 +396,10 @@ func (exec *txEngine) runTxInParallel(txRange *TxRange, txBundle []types.TxToRun
 			k := types.GetStandbyTxKey(txRange.start + uint64(myIdx))
 			Runners[myIdx].Ctx.Rbt.GetBaseStore().PrepareForDeletion(k) // remove it from the standby queue
 			k = types.GetStandbyTxKey(txRange.end + uint64(myIdx))
-			Runners[myIdx].Ctx.Rbt.GetBaseStore().PrepareForUpdate(k) //warmup
+			Runners[myIdx].Ctx.Rbt.GetBaseStore().PrepareForUpdate(k) //warm up
 			if myIdx > 0 && txBundle[myIdx-1].From == txBundle[myIdx].From {
-				// same from-address as previous transaction, cannot run
+				// In reorderInfoList, we placed the tx with same 'From' back-to-back
+				// same from-address as previous transaction, cannot run in same round
 				Runners[myIdx].Status = types.TX_NONCE_TOO_LARGE
 			} else {
 				runTx(int(myIdx), currBlock)
@@ -411,13 +417,12 @@ type indexAndBool struct {
 
 // Check interdependency of TXs using 'touchedSet'. The ones with dependency with former committed TXs cannot
 // be committed and should be inserted back into the standby queue.
-// A TX whose nonce is too small should also be inserted back into the standby queue.
 func (exec *txEngine) checkTxDepsAndUptStandbyQ(txRange *TxRange, txBundle []types.TxToRun, kvCount int) {
 	touchedSet := make(map[uint64]struct{}, kvCount)
 	var wg sync.WaitGroup
 	idxChan := make(chan indexAndBool, 10)
 	wg.Add(1)
-	go func() { // Closing the rabbit stores
+	go func() { // this goroutine commits the rabbit stores
 		for {
 			idxAndBool := <-idxChan
 			if idxAndBool.idx < 0 {
@@ -468,21 +473,20 @@ func (exec *txEngine) checkTxDepsAndUptStandbyQ(txRange *TxRange, txBundle []typ
 			} else if status == types.ACCOUNT_NOT_EXIST || status == types.TX_NONCE_TOO_SMALL {
 				//collect invalid tx`s all gas
 				exec.cumulativeGasUsed += Runners[idx].Tx.Gas
+				exec.cumulativeGasFee.Add(exec.cumulativeGasFee, Runners[idx].GetGasFee())
 				Runners[idx] = nil
 			}
 		}
 	})
 }
 
-// Fill 'exec.committedTxs' with 'committableTxList'
-func (exec *txEngine) collectCommittableTxs(committableTxList []*TxRunner) {
+// Fill 'exec.committedTxs' with 'committableRunnerList'
+func (exec *txEngine) collectCommittableTxs(committableRunnerList []*TxRunner) {
 	var logIndex uint
-	for idx, runner := range committableTxList {
+	for idx, runner := range committableRunnerList {
 		exec.cumulativeGasUsed += runner.GasUsed
 		exec.cumulativeGasRefund.Add(exec.cumulativeGasRefund, &runner.GasRefund)
-		exec.cumulativeGasFee.Add(exec.cumulativeGasFee,
-			uint256.NewInt().Mul(uint256.NewInt().SetUint64(runner.GasUsed),
-				uint256.NewInt().SetBytes(runner.Tx.GasPrice[:])))
+		exec.cumulativeGasFee.Add(exec.cumulativeGasFee, runner.GetGasFee())
 		tx := &types.Transaction{
 			Hash:              runner.Tx.HashID,
 			TransactionIndex:  int64(idx),
@@ -497,7 +501,7 @@ func (exec *txEngine) collectCommittableTxs(committableTxList []*TxRunner) {
 			Input:             runner.Tx.Data,
 			CumulativeGasUsed: exec.cumulativeGasUsed,
 			GasUsed:           runner.GasUsed,
-			ContractAddress:   runner.CreatedContractAddress, //20 Bytes - the contract address created, if the transaction was a contract creation, otherwise - null. TODO testme!
+			ContractAddress:   runner.CreatedContractAddress, //20 Bytes - the contract address created, if the transaction was a contract creation, otherwise - null.
 			OutData:           append([]byte{}, runner.OutData...),
 			Status:            gethtypes.ReceiptStatusSuccessful,
 			StatusStr:         StatusToStr(runner.Status),
@@ -517,7 +521,7 @@ func (exec *txEngine) collectCommittableTxs(committableTxList []*TxRunner) {
 			tx.Logs[i].BlockNumber = uint64(exec.currentBlock.Number)
 			copy(tx.Logs[i].BlockHash[:], exec.currentBlock.Hash[:])
 			copy(tx.Logs[i].TxHash[:], tx.Hash[:])
-			//txIndex = index in committableTxList
+			//txIndex = index in committableRunnerList
 			tx.Logs[i].TxIndex = uint(idx)
 			tx.Logs[i].Index = logIndex
 			logIndex++
@@ -596,18 +600,6 @@ func (exec *txEngine) GasUsedInfo() (gasUsed uint64, gasRefund, gasFee uint256.I
 func (exec *txEngine) StandbyQLen() int {
 	s, e := exec.getStandbyQueueRange()
 	return int(e - s)
-}
-
-func parallelRun(workerCount int, fn func(workerID int)) {
-	var wg sync.WaitGroup
-	wg.Add(workerCount)
-	for i := 0; i < workerCount; i++ {
-		go func(i int) {
-			fn(i)
-			wg.Done()
-		}(i)
-	}
-	wg.Wait()
 }
 
 var (
