@@ -545,10 +545,6 @@ evmc_result evmc_host_context::create_with_contract_addr(const evmc_address& add
 
 	bool max_code_size_exceed = result.output_size > MAX_CODE_SIZE;
 	if(result.status_code == EVMC_SUCCESS && !max_code_size_exceed) {
-		if(result.output_size >= 1 && result.output_data[0] == 0xEF) {
-			result.status_code = EVMC_FAILURE; // support EIP-3541
-			result.gas_left = 0;
-		}
 		int64_t create_data_gas = result.output_size * CREATE_DATA_GAS;
 		if(result.gas_left >= create_data_gas) {
 			result.gas_left -= create_data_gas;
