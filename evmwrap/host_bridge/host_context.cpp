@@ -546,7 +546,10 @@ evmc_result evmc_host_context::create_with_contract_addr(const evmc_address& add
 	bool max_code_size_exceed = result.output_size > MAX_CODE_SIZE;
 	if(result.status_code == EVMC_SUCCESS && !max_code_size_exceed) {
 		int64_t create_data_gas = result.output_size * CREATE_DATA_GAS;
-		if(result.gas_left >= create_data_gas) {
+		if(result.output_size >= 1 && result.output_data[0] == 0xEF) {
+			result.status_code = EVMC_FAILURE; // support EIP-3541
+			result.gas_left = 0;
+		} else if(result.gas_left >= create_data_gas) {
 			result.gas_left -= create_data_gas;
 			evmc_bytes32 codehash = keccak256(result.output_data, result.output_size);
 			txctrl->update_bytecode(addr, bytes(result.output_data, result.output_size), codehash);
@@ -556,8 +559,7 @@ evmc_result evmc_host_context::create_with_contract_addr(const evmc_address& add
 		}
 		result.output_size = 0; //the output is used as code, not returndata
 	}
-	if(max_code_size_exceed || (result.status_code != EVMC_SUCCESS /*&& 
-		result.status_code != EVMC_OUT_OF_GAS*/)) {
+	if(max_code_size_exceed || (result.status_code != EVMC_SUCCESS)) {
 		txctrl->revert_to_snapshot(snapshot);
 		if(result.status_code != EVMC_REVERT) {
 			result.gas_left = 0;
