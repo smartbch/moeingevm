@@ -1,4 +1,4 @@
-OBJS = keccak.o keccakf800.o
+OBJS = instruction_metrics.o instruction_names.o
 
 all : ${OBJS}
 

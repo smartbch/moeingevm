@@ -173,7 +173,11 @@ public:
 	evmc_result create2();
 	bool create_pre_check(const evmc_address& new_addr);
 	evmc_result create_with_contract_addr(const evmc_address& addr);
+	enum evmc_access_status access_account(const evmc_address& address) {
+		return txctrl->access_account(address);
+	}
+	enum evmc_access_status access_storage(const evmc_address& addr, const evmc_bytes32& key) {
+		return txctrl->access_storage(addr, key);
+	}
 	void check_eip158();
-
 };
-

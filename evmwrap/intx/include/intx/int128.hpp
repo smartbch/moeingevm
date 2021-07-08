@@ -14,6 +14,10 @@
 #include <tuple>
 #include <type_traits>
 
+#ifndef __has_builtin
+    #define __has_builtin(NAME) 0
+#endif
+
 #ifdef _MSC_VER
     #include <intrin.h>
 #endif
@@ -49,8 +53,27 @@
     #define INTX_REQUIRE(X) (X) ? (void)0 : INTX_UNREACHABLE()
 #endif
 
+
+// Detect compiler support for 128-bit integer __int128
+#if defined(__SIZEOF_INT128__)
+    #define INTX_HAS_BUILTIN_INT128 1
+#else
+    #define INTX_HAS_BUILTIN_INT128 0
+#endif
+
+
 namespace intx
 {
+#if INTX_HAS_BUILTIN_INT128
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wpedantic"  // Usage of __int128 triggers a pedantic warning.
+
+/// Alias for the compiler supported unsigned __int128 type.
+using builtin_uint128 = unsigned __int128;
+
+    #pragma GCC diagnostic pop
+#endif
+
 template <unsigned N>
 struct uint;
 
@@ -61,45 +84,59 @@ struct uint;
 template <>
 struct uint<128>
 {
+    using word_type = uint64_t;
+    static constexpr auto word_num_bits = sizeof(word_type) * 8;
     static constexpr unsigned num_bits = 128;
+    static constexpr auto num_words = num_bits / word_num_bits;
 
-    uint64_t lo = 0;
-    uint64_t hi = 0;
+private:
+    uint64_t words_[2]{};
 
+public:
     constexpr uint() noexcept = default;
 
-    constexpr uint(uint64_t high, uint64_t low) noexcept : lo{low}, hi{high} {}
+    constexpr uint(uint64_t low, uint64_t high) noexcept : words_{low, high} {}
 
     template <typename T,
         typename = typename std::enable_if_t<std::is_convertible<T, uint64_t>::value>>
-    constexpr uint(T x) noexcept : lo(static_cast<uint64_t>(x))  // NOLINT
+    constexpr uint(T x) noexcept : words_{static_cast<uint64_t>(x), 0}  // NOLINT
     {}
 
-#ifdef __SIZEOF_INT128__
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wpedantic"
-    constexpr uint(unsigned __int128 x) noexcept  // NOLINT
-      : lo{uint64_t(x)}, hi{uint64_t(x >> 64)}
+#if INTX_HAS_BUILTIN_INT128
+    constexpr uint(builtin_uint128 x) noexcept  // NOLINT
+      : words_{uint64_t(x), uint64_t(x >> 64)}
     {}
 
-    constexpr explicit operator unsigned __int128() const noexcept
+    constexpr explicit operator builtin_uint128() const noexcept
     {
-        return (static_cast<unsigned __int128>(hi) << 64) | lo;
+        return (builtin_uint128{words_[1]} << 64) | words_[0];
     }
-    #pragma GCC diagnostic pop
 #endif
 
-    constexpr explicit operator bool() const noexcept { return hi | lo; }
+    constexpr uint64_t& operator[](size_t i) noexcept { return words_[i]; }
+    constexpr const uint64_t& operator[](size_t i) const noexcept { return words_[i]; }
+
+    constexpr explicit operator bool() const noexcept { return (words_[0] | words_[1]) != 0; }
 
     /// Explicit converting operator for all builtin integral types.
     template <typename Int, typename = typename std::enable_if<std::is_integral<Int>::value>::type>
     constexpr explicit operator Int() const noexcept
     {
-        return static_cast<Int>(lo);
+        return static_cast<Int>(words_[0]);
     }
 };
 
 using uint128 = uint<128>;
+
+
+inline constexpr bool is_constant_evaluated() noexcept
+{
+#if __has_builtin(__builtin_is_constant_evaluated) || (defined(_MSC_VER) && _MSC_VER >= 1925)
+    return __builtin_is_constant_evaluated();
+#else
+    return true;
+#endif
+}
 
 
 /// Contains result of add/sub/etc with a carry flag.
@@ -117,7 +154,7 @@ struct result_with_carry
 /// Linear arithmetic operators.
 /// @{
 
-constexpr inline result_with_carry<uint64_t> add_with_carry(
+inline constexpr result_with_carry<uint64_t> add_with_carry(
     uint64_t x, uint64_t y, bool carry = false) noexcept
 {
     const auto s = x + y;
@@ -128,51 +165,66 @@ constexpr inline result_with_carry<uint64_t> add_with_carry(
 }
 
 template <unsigned N>
-constexpr result_with_carry<uint<N>> add_with_carry(
-    const uint<N>& a, const uint<N>& b, bool carry = false) noexcept
+inline constexpr result_with_carry<uint<N>> add_with_carry(
+    const uint<N>& x, const uint<N>& y, bool carry = false) noexcept
 {
-    const auto lo = add_with_carry(a.lo, b.lo, carry);
-    const auto hi = add_with_carry(a.hi, b.hi, lo.carry);
-    return {{hi.value, lo.value}, hi.carry};
+    uint<N> s;
+    bool k = carry;
+    for (size_t i = 0; i < uint<N>::num_words; ++i)
+    {
+        s[i] = x[i] + y[i];
+        const auto k1 = s[i] < x[i];
+        s[i] += k;
+        k = (s[i] < uint64_t{k}) || k1;
+    }
+    return {s, k};
 }
 
-constexpr inline uint128 operator+(uint128 x, uint128 y) noexcept
+inline constexpr uint128 operator+(uint128 x, uint128 y) noexcept
 {
     return add_with_carry(x, y).value;
 }
 
-constexpr inline uint128 operator+(uint128 x) noexcept
+inline constexpr uint128 operator+(uint128 x) noexcept
 {
     return x;
 }
 
-constexpr inline result_with_carry<uint64_t> sub_with_carry(
+inline constexpr result_with_carry<uint64_t> sub_with_carry(
     uint64_t x, uint64_t y, bool carry = false) noexcept
 {
     const auto d = x - y;
-    const auto carry1 = d > x;
+    const auto carry1 = x < y;
     const auto e = d - carry;
-    const auto carry2 = e > d;
+    const auto carry2 = d < uint64_t{carry};
     return {e, carry1 || carry2};
 }
 
 /// Performs subtraction of two unsigned numbers and returns the difference
 /// and the carry bit (aka borrow, overflow).
 template <unsigned N>
-constexpr inline result_with_carry<uint<N>> sub_with_carry(
-    const uint<N>& a, const uint<N>& b, bool carry = false) noexcept
+inline constexpr result_with_carry<uint<N>> sub_with_carry(
+    const uint<N>& x, const uint<N>& y, bool carry = false) noexcept
 {
-    const auto lo = sub_with_carry(a.lo, b.lo, carry);
-    const auto hi = sub_with_carry(a.hi, b.hi, lo.carry);
-    return {{hi.value, lo.value}, hi.carry};
+    uint<N> z;
+    bool k = carry;
+    for (size_t i = 0; i < uint<N>::num_words; ++i)
+    {
+        z[i] = x[i] - y[i];
+        const auto k1 = x[i] < y[i];
+        const auto k2 = z[i] < uint64_t{k};
+        z[i] -= k;
+        k = k1 || k2;
+    }
+    return {z, k};
 }
 
-constexpr inline uint128 operator-(uint128 x, uint128 y) noexcept
+inline constexpr uint128 operator-(uint128 x, uint128 y) noexcept
 {
     return sub_with_carry(x, y).value;
 }
 
-constexpr inline uint128 operator-(uint128 x) noexcept
+inline constexpr uint128 operator-(uint128 x) noexcept
 {
     // Implementing as subtraction is better than ~x + 1.
     // Clang9: Perfect.
@@ -208,17 +260,12 @@ inline uint128 operator--(uint128& x, int) noexcept
 ///
 /// This keeps the multiprecision addition until CodeGen so the pattern is not
 /// broken during other optimizations.
-constexpr uint128 fast_add(uint128 x, uint128 y) noexcept
+inline constexpr uint128 fast_add(uint128 x, uint128 y) noexcept
 {
-#ifdef __SIZEOF_INT128__
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wpedantic"
-    using uint128_native = unsigned __int128;
-    return uint128_native{x} + uint128_native{y};
-    #pragma GCC diagnostic pop
+#if INTX_HAS_BUILTIN_INT128
+    return builtin_uint128{x} + builtin_uint128{y};
 #else
-    // Fallback to regular addition.
-    return x + y;
+    return x + y;  // Fallback to generic addition.
 #endif
 }
 
@@ -232,40 +279,44 @@ constexpr uint128 fast_add(uint128 x, uint128 y) noexcept
 ///
 /// @{
 
-constexpr bool operator==(uint128 x, uint128 y) noexcept
+inline constexpr bool operator==(uint128 x, uint128 y) noexcept
 {
     // Clang7: generates perfect xor based code,
     //         much better than __int128 where it uses vector instructions.
     // GCC8: generates a bit worse cmp based code
     //       although it generates the xor based one for __int128.
-    return (x.lo == y.lo) & (x.hi == y.hi);
+    return (x[0] == y[0]) & (x[1] == y[1]);
 }
 
-constexpr bool operator!=(uint128 x, uint128 y) noexcept
+inline constexpr bool operator!=(uint128 x, uint128 y) noexcept
 {
     // Analogous to ==, but == not used directly, because that confuses GCC 8-9.
-    return (x.lo != y.lo) | (x.hi != y.hi);
+    return (x[0] != y[0]) | (x[1] != y[1]);
 }
 
-constexpr bool operator<(uint128 x, uint128 y) noexcept
+inline constexpr bool operator<(uint128 x, uint128 y) noexcept
 {
     // OPT: This should be implemented by checking the borrow of x - y,
     //      but compilers (GCC8, Clang7)
     //      have problem with properly optimizing subtraction.
-    return (x.hi < y.hi) | ((x.hi == y.hi) & (x.lo < y.lo));
+#if INTX_HAS_BUILTIN_INT128
+    return builtin_uint128{x} < builtin_uint128{y};
+#else
+    return (x[1] < y[1]) | ((x[1] == y[1]) & (x[0] < y[0]));
+#endif
 }
 
-constexpr bool operator<=(uint128 x, uint128 y) noexcept
+inline constexpr bool operator<=(uint128 x, uint128 y) noexcept
 {
     return !(y < x);
 }
 
-constexpr bool operator>(uint128 x, uint128 y) noexcept
+inline constexpr bool operator>(uint128 x, uint128 y) noexcept
 {
     return y < x;
 }
 
-constexpr bool operator>=(uint128 x, uint128 y) noexcept
+inline constexpr bool operator>=(uint128 x, uint128 y) noexcept
 {
     return !(x < y);
 }
@@ -276,66 +327,67 @@ constexpr bool operator>=(uint128 x, uint128 y) noexcept
 /// Bitwise operators.
 /// @{
 
-constexpr uint128 operator~(uint128 x) noexcept
+inline constexpr uint128 operator~(uint128 x) noexcept
 {
-    return {~x.hi, ~x.lo};
+    return {~x[0], ~x[1]};
 }
 
-constexpr uint128 operator|(uint128 x, uint128 y) noexcept
+inline constexpr uint128 operator|(uint128 x, uint128 y) noexcept
 {
     // Clang7: perfect.
     // GCC8: stupidly uses a vector instruction in all bitwise operators.
-    return {x.hi | y.hi, x.lo | y.lo};
+    return {x[0] | y[0], x[1] | y[1]};
 }
 
-constexpr uint128 operator&(uint128 x, uint128 y) noexcept
+inline constexpr uint128 operator&(uint128 x, uint128 y) noexcept
 {
-    return {x.hi & y.hi, x.lo & y.lo};
+    return {x[0] & y[0], x[1] & y[1]};
 }
 
-constexpr uint128 operator^(uint128 x, uint128 y) noexcept
+inline constexpr uint128 operator^(uint128 x, uint128 y) noexcept
 {
-    return {x.hi ^ y.hi, x.lo ^ y.lo};
+    return {x[0] ^ y[0], x[1] ^ y[1]};
 }
 
-constexpr uint128 operator<<(uint128 x, unsigned shift) noexcept
+inline constexpr uint128 operator<<(uint128 x, uint64_t shift) noexcept
 {
     return (shift < 64) ?
                // Find the part moved from lo to hi.
                // For shift == 0 right shift by (64 - shift) is invalid so
                // split it into 2 shifts by 1 and (63 - shift).
-               uint128{(x.hi << shift) | ((x.lo >> 1) >> (63 - shift)), x.lo << shift} :
+               uint128{x[0] << shift, (x[1] << shift) | ((x[0] >> 1) >> (63 - shift))} :
 
                // Guarantee "defined" behavior for shifts larger than 128.
-               (shift < 128) ? uint128{x.lo << (shift - 64), 0} : 0;
+               (shift < 128) ? uint128{0, x[0] << (shift - 64)} : 0;
 }
 
-constexpr uint128 operator<<(uint128 x, uint128 shift) noexcept
+inline constexpr uint128 operator<<(uint128 x, uint128 shift) noexcept
 {
-    if (shift < 128)
-        return x << unsigned(shift);
-    return 0;
+    if (INTX_UNLIKELY(shift[1] != 0))
+        return 0;
+
+    return x << shift[0];
 }
 
-constexpr uint128 operator>>(uint128 x, unsigned shift) noexcept
+inline constexpr uint128 operator>>(uint128 x, uint64_t shift) noexcept
 {
     return (shift < 64) ?
                // Find the part moved from lo to hi.
                // For shift == 0 left shift by (64 - shift) is invalid so
                // split it into 2 shifts by 1 and (63 - shift).
-               uint128{x.hi >> shift, (x.lo >> shift) | ((x.hi << 1) << (63 - shift))} :
+               uint128{(x[0] >> shift) | ((x[1] << 1) << (63 - shift)), x[1] >> shift} :
 
                // Guarantee "defined" behavior for shifts larger than 128.
-               (shift < 128) ? uint128{0, x.hi >> (shift - 64)} : 0;
+               (shift < 128) ? uint128{x[1] >> (shift - 64)} : 0;
 }
 
-constexpr uint128 operator>>(uint128 x, uint128 shift) noexcept
+inline constexpr uint128 operator>>(uint128 x, uint128 shift) noexcept
 {
-    if (shift < 128)
-        return x >> unsigned(shift);
-    return 0;
-}
+    if (INTX_UNLIKELY(shift[1] != 0))
+        return 0;
 
+    return x >> static_cast<uint64_t>(shift);
+}
 
 /// @}
 
@@ -343,9 +395,22 @@ constexpr uint128 operator>>(uint128 x, uint128 shift) noexcept
 /// Multiplication
 /// @{
 
-/// Portable full unsigned multiplication 64 x 64 -> 128.
-constexpr uint128 constexpr_umul(uint64_t x, uint64_t y) noexcept
+/// Full unsigned multiplication 64 x 64 -> 128.
+inline constexpr uint128 umul(uint64_t x, uint64_t y) noexcept
 {
+#if INTX_HAS_BUILTIN_INT128
+    return builtin_uint128{x} * builtin_uint128{y};
+#elif defined(_MSC_VER) && _MSC_VER >= 1925
+    if (!is_constant_evaluated())
+    {
+        unsigned __int64 hi = 0;
+        const auto lo = _umul128(x, y, &hi);
+        return {lo, hi};
+    }
+    // For constexpr fallback to portable variant.
+#endif
+
+    // Portable full unsigned multiplication 64 x 64 -> 128.
     uint64_t xl = x & 0xffffffff;
     uint64_t xh = x >> 32;
     uint64_t yl = y & 0xffffffff;
@@ -361,39 +426,14 @@ constexpr uint128 constexpr_umul(uint64_t x, uint64_t y) noexcept
 
     uint64_t lo = (u2 << 32) | (t0 & 0xffffffff);
     uint64_t hi = t3 + (u2 >> 32) + (u1 >> 32);
-    return {hi, lo};
+    return {lo, hi};
 }
 
-/// Full unsigned multiplication 64 x 64 -> 128.
-inline uint128 umul(uint64_t x, uint64_t y) noexcept
+inline constexpr uint128 operator*(uint128 x, uint128 y) noexcept
 {
-#if defined(__SIZEOF_INT128__)
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wpedantic"
-    const auto p = static_cast<unsigned __int128>(x) * y;
-    return {uint64_t(p >> 64), uint64_t(p)};
-    #pragma GCC diagnostic pop
-#elif defined(_MSC_VER)
-    unsigned __int64 hi;
-    const auto lo = _umul128(x, y, &hi);
-    return {hi, lo};
-#else
-    return constexpr_umul(x, y);
-#endif
-}
-
-inline uint128 operator*(uint128 x, uint128 y) noexcept
-{
-    auto p = umul(x.lo, y.lo);
-    p.hi += (x.lo * y.hi) + (x.hi * y.lo);
-    return {p.hi, p.lo};
-}
-
-constexpr uint128 constexpr_mul(uint128 x, uint128 y) noexcept
-{
-    auto p = constexpr_umul(x.lo, y.lo);
-    p.hi += (x.lo * y.hi) + (x.hi * y.lo);
-    return {p.hi, p.lo};
+    auto p = umul(x[0], y[0]);
+    p[1] += (x[0] * y[1]) + (x[1] * y[0]);
+    return {p[0], p[1]};
 }
 
 /// @}
@@ -402,12 +442,12 @@ constexpr uint128 constexpr_mul(uint128 x, uint128 y) noexcept
 /// Assignment operators.
 /// @{
 
-constexpr uint128& operator+=(uint128& x, uint128 y) noexcept
+inline constexpr uint128& operator+=(uint128& x, uint128 y) noexcept
 {
     return x = x + y;
 }
 
-constexpr uint128& operator-=(uint128& x, uint128 y) noexcept
+inline constexpr uint128& operator-=(uint128& x, uint128 y) noexcept
 {
     return x = x - y;
 }
@@ -417,27 +457,27 @@ inline uint128& operator*=(uint128& x, uint128 y) noexcept
     return x = x * y;
 }
 
-constexpr uint128& operator|=(uint128& x, uint128 y) noexcept
+inline constexpr uint128& operator|=(uint128& x, uint128 y) noexcept
 {
     return x = x | y;
 }
 
-constexpr uint128& operator&=(uint128& x, uint128 y) noexcept
+inline constexpr uint128& operator&=(uint128& x, uint128 y) noexcept
 {
     return x = x & y;
 }
 
-constexpr uint128& operator^=(uint128& x, uint128 y) noexcept
+inline constexpr uint128& operator^=(uint128& x, uint128 y) noexcept
 {
     return x = x ^ y;
 }
 
-constexpr uint128& operator<<=(uint128& x, unsigned shift) noexcept
+inline constexpr uint128& operator<<=(uint128& x, uint64_t shift) noexcept
 {
     return x = x << shift;
 }
 
-constexpr uint128& operator>>=(uint128& x, unsigned shift) noexcept
+inline constexpr uint128& operator>>=(uint128& x, uint64_t shift) noexcept
 {
     return x = x >> shift;
 }
@@ -445,7 +485,7 @@ constexpr uint128& operator>>=(uint128& x, unsigned shift) noexcept
 /// @}
 
 
-constexpr unsigned clz_generic(uint32_t x) noexcept
+inline constexpr unsigned clz_generic(uint32_t x) noexcept
 {
     unsigned n = 32;
     for (int i = 4; i >= 0; --i)
@@ -461,7 +501,7 @@ constexpr unsigned clz_generic(uint32_t x) noexcept
     return n - x;
 }
 
-constexpr unsigned clz_generic(uint64_t x) noexcept
+inline constexpr unsigned clz_generic(uint64_t x) noexcept
 {
     unsigned n = 64;
     for (int i = 5; i >= 0; --i)
@@ -477,7 +517,7 @@ constexpr unsigned clz_generic(uint64_t x) noexcept
     return n - static_cast<unsigned>(x);
 }
 
-constexpr inline unsigned clz(uint32_t x) noexcept
+inline constexpr unsigned clz(uint32_t x) noexcept
 {
 #ifdef _MSC_VER
     return clz_generic(x);
@@ -486,7 +526,7 @@ constexpr inline unsigned clz(uint32_t x) noexcept
 #endif
 }
 
-constexpr inline unsigned clz(uint64_t x) noexcept
+inline constexpr unsigned clz(uint64_t x) noexcept
 {
 #ifdef _MSC_VER
     return clz_generic(x);
@@ -495,25 +535,31 @@ constexpr inline unsigned clz(uint64_t x) noexcept
 #endif
 }
 
-constexpr inline unsigned clz(uint128 x) noexcept
+inline constexpr unsigned clz(uint128 x) noexcept
 {
     // In this order `h == 0` we get less instructions than in case of `h != 0`.
-    return x.hi == 0 ? clz(x.lo) + 64 : clz(x.hi);
+    return x[1] == 0 ? clz(x[0]) + 64 : clz(x[1]);
 }
 
 
-inline uint64_t bswap(uint64_t x) noexcept
+inline constexpr uint64_t bswap(uint64_t x) noexcept
 {
-#ifdef _MSC_VER
-    return _byteswap_uint64(x);
-#else
+#if __has_builtin(__builtin_bswap64)
     return __builtin_bswap64(x);
+#else
+    #ifdef _MSC_VER
+    if (!is_constant_evaluated())
+        return _byteswap_uint64(x);
+    #endif
+    const auto a = ((x << 8) & 0xFF00FF00FF00FF00) | ((x >> 8) & 0x00FF00FF00FF00FF);
+    const auto b = ((a << 16) & 0xFFFF0000FFFF0000) | ((a >> 16) & 0x0000FFFF0000FFFF);
+    return (b << 32) | (b >> 32);
 #endif
 }
 
-inline uint128 bswap(uint128 x) noexcept
+inline constexpr uint128 bswap(uint128 x) noexcept
 {
-    return {bswap(x.lo), bswap(x.hi)};
+    return {bswap(x[1]), bswap(x[0])};
 }
 
 
@@ -532,7 +578,7 @@ struct div_result
 
 namespace internal
 {
-constexpr uint16_t reciprocal_table_item(uint8_t d9) noexcept
+inline constexpr uint16_t reciprocal_table_item(uint8_t d9) noexcept
 {
     return uint16_t(0x7fd00 / (0x100 | d9));
 }
@@ -575,37 +621,37 @@ inline uint64_t reciprocal_2by1(uint64_t d) noexcept
     const uint64_t d0 = d & 1;
     const uint64_t d63 = (d >> 1) + d0;  // ceil(d/2)
     const uint64_t e = ((v2 >> 1) & (0 - d0)) - v2 * d63;
-    const uint64_t v3 = (umul(v2, e).hi >> 1) + (v2 << 31);
+    const uint64_t v3 = (umul(v2, e)[1] >> 1) + (v2 << 31);
 
-    const uint64_t v4 = v3 - (umul(v3, d) + d).hi - d;
+    const uint64_t v4 = v3 - (umul(v3, d) + d)[1] - d;
     return v4;
 }
 
 inline uint64_t reciprocal_3by2(uint128 d) noexcept
 {
-    auto v = reciprocal_2by1(d.hi);
-    auto p = d.hi * v;
-    p += d.lo;
-    if (p < d.lo)
+    auto v = reciprocal_2by1(d[1]);
+    auto p = d[1] * v;
+    p += d[0];
+    if (p < d[0])
     {
         --v;
-        if (p >= d.hi)
+        if (p >= d[1])
         {
             --v;
-            p -= d.hi;
+            p -= d[1];
         }
-        p -= d.hi;
+        p -= d[1];
     }
 
-    const auto t = umul(v, d.lo);
+    const auto t = umul(v, d[0]);
 
-    p += t.hi;
-    if (p < t.hi)
+    p += t[1];
+    if (p < t[1])
     {
         --v;
-        if (p >= d.hi)
+        if (p >= d[1])
         {
-            if (p > d.hi || t.lo >= d.lo)
+            if (p > d[1] || t[0] >= d[0])
                 --v;
         }
     }
@@ -614,99 +660,99 @@ inline uint64_t reciprocal_3by2(uint128 d) noexcept
 
 inline div_result<uint64_t> udivrem_2by1(uint128 u, uint64_t d, uint64_t v) noexcept
 {
-    auto q = umul(v, u.hi);
+    auto q = umul(v, u[1]);
     q = fast_add(q, u);
 
-    ++q.hi;
+    ++q[1];
 
-    auto r = u.lo - q.hi * d;
+    auto r = u[0] - q[1] * d;
 
-    if (r > q.lo)
+    if (r > q[0])
     {
-        --q.hi;
+        --q[1];
         r += d;
     }
 
     if (r >= d)
     {
-        ++q.hi;
+        ++q[1];
         r -= d;
     }
 
-    return {q.hi, r};
+    return {q[1], r};
 }
 
 inline div_result<uint64_t, uint128> udivrem_3by2(
     uint64_t u2, uint64_t u1, uint64_t u0, uint128 d, uint64_t v) noexcept
 {
     auto q = umul(v, u2);
-    q = fast_add(q, {u2, u1});
+    q = fast_add(q, {u1, u2});
 
-    auto r1 = u1 - q.hi * d.hi;
+    auto r1 = u1 - q[1] * d[1];
 
-    auto t = umul(d.lo, q.hi);
+    auto t = umul(d[0], q[1]);
 
-    auto r = uint128{r1, u0} - t - d;
-    r1 = r.hi;
+    auto r = uint128{u0, r1} - t - d;
+    r1 = r[1];
 
-    ++q.hi;
+    ++q[1];
 
-    if (r1 >= q.lo)
+    if (r1 >= q[0])
     {
-        --q.hi;
+        --q[1];
         r += d;
     }
 
     if (r >= d)
     {
-        ++q.hi;
+        ++q[1];
         r -= d;
     }
 
-    return {q.hi, r};
+    return {q[1], r};
 }
 
 inline div_result<uint128> udivrem(uint128 x, uint128 y) noexcept
 {
-    if (y.hi == 0)
+    if (y[1] == 0)
     {
-        INTX_REQUIRE(y.lo != 0);  // Division by 0.
+        INTX_REQUIRE(y[0] != 0);  // Division by 0.
 
-        const auto lsh = clz(y.lo);
+        const auto lsh = clz(y[0]);
         const auto rsh = (64 - lsh) % 64;
         const auto rsh_mask = uint64_t{lsh == 0} - 1;
 
-        const auto yn = y.lo << lsh;
-        const auto xn_lo = x.lo << lsh;
-        const auto xn_hi = (x.hi << lsh) | ((x.lo >> rsh) & rsh_mask);
-        const auto xn_ex = (x.hi >> rsh) & rsh_mask;
+        const auto yn = y[0] << lsh;
+        const auto xn_lo = x[0] << lsh;
+        const auto xn_hi = (x[1] << lsh) | ((x[0] >> rsh) & rsh_mask);
+        const auto xn_ex = (x[1] >> rsh) & rsh_mask;
 
         const auto v = reciprocal_2by1(yn);
-        const auto res1 = udivrem_2by1({xn_ex, xn_hi}, yn, v);
-        const auto res2 = udivrem_2by1({res1.rem, xn_lo}, yn, v);
-        return {{res1.quot, res2.quot}, res2.rem >> lsh};
+        const auto res1 = udivrem_2by1({xn_hi, xn_ex}, yn, v);
+        const auto res2 = udivrem_2by1({xn_lo, res1.rem}, yn, v);
+        return {{res2.quot, res1.quot}, res2.rem >> lsh};
     }
 
-    if (y.hi > x.hi)
+    if (y[1] > x[1])
         return {0, x};
 
-    const auto lsh = clz(y.hi);
+    const auto lsh = clz(y[1]);
     if (lsh == 0)
     {
-        const auto q = unsigned{y.hi < x.hi} | unsigned{y.lo <= x.lo};
+        const auto q = unsigned{y[1] < x[1]} | unsigned{y[0] <= x[0]};
         return {q, x - (q ? y : 0)};
     }
 
     const auto rsh = 64 - lsh;
 
-    const auto yn_lo = y.lo << lsh;
-    const auto yn_hi = (y.hi << lsh) | (y.lo >> rsh);
-    const auto xn_lo = x.lo << lsh;
-    const auto xn_hi = (x.hi << lsh) | (x.lo >> rsh);
-    const auto xn_ex = x.hi >> rsh;
+    const auto yn_lo = y[0] << lsh;
+    const auto yn_hi = (y[1] << lsh) | (y[0] >> rsh);
+    const auto xn_lo = x[0] << lsh;
+    const auto xn_hi = (x[1] << lsh) | (x[0] >> rsh);
+    const auto xn_ex = x[1] >> rsh;
 
-    const auto v = reciprocal_3by2({yn_hi, yn_lo});
-    const auto res = udivrem_3by2(xn_ex, xn_hi, xn_lo, {yn_hi, yn_lo}, v);
+    const auto v = reciprocal_3by2({yn_lo, yn_hi});
+    const auto res = udivrem_3by2(xn_ex, xn_hi, xn_lo, {yn_lo, yn_hi}, v);
 
     return {res.quot, res.rem >> lsh};
 }
@@ -808,14 +854,14 @@ template <typename T>
 #endif
 }
 
-constexpr inline int from_dec_digit(char c)
+inline constexpr int from_dec_digit(char c)
 {
     if (c < '0' || c > '9')
         throw_<std::invalid_argument>("invalid digit");
     return c - '0';
 }
 
-constexpr inline int from_hex_digit(char c)
+inline constexpr int from_hex_digit(char c)
 {
     if (c >= 'a' && c <= 'f')
         return c - ('a' - 10);
@@ -825,7 +871,7 @@ constexpr inline int from_hex_digit(char c)
 }
 
 template <typename Int>
-constexpr Int from_string(const char* str)
+inline constexpr Int from_string(const char* str)
 {
     auto s = str;
     auto x = Int{};
@@ -838,7 +884,7 @@ constexpr Int from_string(const char* str)
         {
             if (++num_digits > int{sizeof(x) * 2})
                 throw_<std::out_of_range>(str);
-            x = (x << 4) | from_hex_digit(c);
+            x = (x << uint64_t{4}) | from_hex_digit(c);
         }
         return x;
     }
@@ -849,7 +895,7 @@ constexpr Int from_string(const char* str)
             throw_<std::out_of_range>(str);
 
         const auto d = from_dec_digit(c);
-        x = constexpr_mul(x, Int{10}) + d;
+        x = x * Int{10} + d;
         if (x < d)
             throw_<std::out_of_range>(str);
     }
@@ -857,12 +903,12 @@ constexpr Int from_string(const char* str)
 }
 
 template <typename Int>
-constexpr Int from_string(const std::string& s)
+inline constexpr Int from_string(const std::string& s)
 {
     return from_string<Int>(s.c_str());
 }
 
-constexpr uint128 operator""_u128(const char* s)
+inline constexpr uint128 operator""_u128(const char* s)
 {
     return from_string<uint128>(s);
 }

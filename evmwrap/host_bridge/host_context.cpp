@@ -101,6 +101,17 @@ struct evmc_result evmc_call(struct evmc_host_context* context,
 	return context->call(*msg);
 }
 
+enum evmc_access_status evmc_access_account(struct evmc_host_context* context,
+                                            const evmc_address* address) {
+	return context->access_account(*address);
+}
+
+enum evmc_access_status evmc_access_storage(struct evmc_host_context* context,
+                                            const evmc_address* address,
+                                            const evmc_bytes32* key) {
+	return context->access_storage(*address, *key);
+}
+
 evmc_host_interface HOST_IFC {
 	.account_exists = evmc_account_exists,
 	.get_storage = evmc_get_storage,
@@ -113,7 +124,9 @@ evmc_host_interface HOST_IFC {
 	.call = evmc_call,
 	.get_tx_context = evmc_get_tx_context,
 	.get_block_hash = evmc_get_block_hash,
-	.emit_log = evmc_emit_log
+	.emit_log = evmc_emit_log,
+	.access_account = evmc_access_account,
+	.access_storage = evmc_access_storage
 };
 
 evmc_bytes32 ZERO_BYTES32 = {};
@@ -419,7 +432,7 @@ evmc_result evmc_host_context::run_precompiled_contract(const evmc_address& addr
 		return evmc_result{.status_code=EVMC_OUT_OF_GAS};
 	}
 	if(ret_value != 1) {
-		return evmc_result{.status_code=EVMC_PRECOMPILED_FAILED};
+		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	return evmc_result{
 		.status_code=EVMC_SUCCESS,
@@ -523,7 +536,7 @@ evmc_result evmc_host_context::create_with_contract_addr(const evmc_address& add
 		txctrl->incr_nonce(msg.sender);
 	}
 	if(!create_pre_check(addr)) {
-		return evmc_result{.status_code = EVMC_RECREATE_CONTRACT, .gas_left = 0};
+		return evmc_result{.status_code = EVMC_FAILURE, .gas_left = 0};
 	}
 	msg.destination = addr;
 	bytes input_as_code(msg.input_data, msg.input_size);
@@ -566,7 +579,7 @@ evmc_result evmc_host_context::create_with_contract_addr(const evmc_address& add
 		}
 	}
 	if(result.status_code == EVMC_SUCCESS && max_code_size_exceed) {
-		result.status_code = EVMC_EXCEED_MAX_CODE_SIZE;
+		result.status_code = EVMC_FAILURE;
 	}
 	result.create_address = addr;
 	return result;
@@ -673,7 +686,7 @@ int64_t zero_depth_call(evmc_uint256be gas_price,
 	evmc_host_context ctx(&txctrl, msg, &smallbuf);
 	uint256 balance = ctx.get_balance_as_uint256(*sender);
 	if(balance < u256be_to_u256(*value)) {
-		evmc_result result {.status_code=EVMC_BALANCE_NOT_ENOUGH, .gas_left=msg.gas};
+		evmc_result result {.status_code=EVMC_INSUFFICIENT_BALANCE, .gas_left=msg.gas};
 		txctrl.collect_result(collect_result_fn, handler, &result);
 		vm->destroy(vm);
 		return 0;
@@ -941,7 +954,7 @@ evmc_result evmc_host_context::sep206_transfer() {
 	memcpy(amount_be.bytes, msg.input_data + 4 + 32, 32);
 	evmc_uint256be balance_be = get_balance(msg.sender);
 	if(memcmp(balance_be.bytes, amount_be.bytes, 32) < 0) { // both are big-endian
-		return evmc_result{.status_code=EVMC_BALANCE_NOT_ENOUGH};
+		return evmc_result{.status_code=EVMC_INSUFFICIENT_BALANCE};
 	}
 	bool is_nop;
 	transfer(txctrl, msg.sender, destination, amount_be, &is_nop);
@@ -968,7 +981,7 @@ evmc_result evmc_host_context::sep206_transferFrom() {
 	uint256 amount = u256be_to_u256(amount_be);
 	evmc_uint256be balance_be = get_balance(source);
 	if(u256be_to_u256(balance_be) < amount) {
-		return evmc_result{.status_code=EVMC_BALANCE_NOT_ENOUGH};
+		return evmc_result{.status_code=EVMC_INSUFFICIENT_BALANCE};
 	}
 	uint8_t owner_and_spender[64]; 
 	memset(owner_and_spender, 0, 64);
