@@ -491,7 +491,7 @@ evmc_result evmc_host_context::run_vm(size_t snapshot) {
 	if(this->code->size() == 0) {
 		return evmc_result{.status_code=EVMC_SUCCESS, .gas_left=msg.gas}; // do nothing
 	}
-	evmc_result result = txctrl->execute(nullptr, &HOST_IFC, this, EVMC_MAX_REVISION, &msg,
+	evmc_result result = txctrl->execute(nullptr, &HOST_IFC, this, EVMC_ISTANBUL, &msg,
 			this->code->data(), this->code->size());
 	if(result.status_code != EVMC_SUCCESS) {
 		txctrl->revert_to_snapshot(snapshot);
