@@ -48,4 +48,5 @@ int64_t zero_depth_call_wrap(evmc_bytes32 gas_price,
                              size_t input_size,
 		             const struct block_info* block,
 		             int collector_handler,
-		             bool need_gas_estimation);
+		             bool need_gas_estimation,
+                             enum evmc_revision revision);

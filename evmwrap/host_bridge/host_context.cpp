@@ -312,7 +312,7 @@ void evmc_host_context::load_code(const evmc_address& addr) {
 
 evmc_result evmc_host_context::call(const evmc_message& call_msg) {
 	txctrl->gas_trace_append(call_msg.gas|MSB64);
-	evmc_host_context ctx(txctrl, call_msg, this->smallbuf);
+	evmc_host_context ctx(txctrl, call_msg, this->smallbuf, this->revision);
 	evmc_result result;
 	bool normal_run = false;
 	switch (call_msg.kind) {
@@ -491,7 +491,7 @@ evmc_result evmc_host_context::run_vm(size_t snapshot) {
 	if(this->code->size() == 0) {
 		return evmc_result{.status_code=EVMC_SUCCESS, .gas_left=msg.gas}; // do nothing
 	}
-	evmc_result result = txctrl->execute(nullptr, &HOST_IFC, this, EVMC_ISTANBUL, &msg,
+	evmc_result result = txctrl->execute(nullptr, &HOST_IFC, this, this->revision, &msg,
 			this->code->data(), this->code->size());
 	if(result.status_code != EVMC_SUCCESS) {
 		txctrl->revert_to_snapshot(snapshot);
@@ -623,6 +623,7 @@ int64_t zero_depth_call(evmc_uint256be gas_price,
 		     const block_info* block,
 		     int handler,
 		     bool need_gas_estimation,
+		     enum evmc_revision revision,
 		     bridge_get_creation_counter_fn get_creation_counter_fn,
 		     bridge_get_account_info_fn get_account_info_fn,
 		     bridge_get_bytecode_fn get_bytecode_fn,
@@ -683,7 +684,7 @@ int64_t zero_depth_call(evmc_uint256be gas_price,
 
 	tx_control txctrl(&r, tx_context, vm->execute, call_precompiled_contract_fn, need_gas_estimation);
 	small_buffer smallbuf;
-	evmc_host_context ctx(&txctrl, msg, &smallbuf);
+	evmc_host_context ctx(&txctrl, msg, &smallbuf, revision);
 	uint256 balance = ctx.get_balance_as_uint256(*sender);
 	if(balance < u256be_to_u256(*value)) {
 		evmc_result result {.status_code=EVMC_INSUFFICIENT_BALANCE, .gas_left=msg.gas};

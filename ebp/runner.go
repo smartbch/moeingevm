@@ -459,7 +459,8 @@ func runTxHelper(idx int, currBlock *types.BlockInfo, estimateGas bool) int64 {
 		C.size_t(len(runner.Tx.Data)),
 		&bi,
 		C.int(idx),
-		C.bool(estimateGas))
+		C.bool(estimateGas),
+		C.EVMC_ISTANBUL)
 	return int64(gasEstimated)
 }
 

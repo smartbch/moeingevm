@@ -81,9 +81,10 @@ private:
 	const bytes* code;
 	bytes empty_code;
 	small_buffer *smallbuf;
+	enum evmc_revision revision;
 public:
-	evmc_host_context(tx_control* tc, evmc_message m, small_buffer* b):
-		txctrl(tc), msg(m), empty_code(), smallbuf(b) {}
+	evmc_host_context(tx_control* tc, evmc_message m, small_buffer* b, enum evmc_revision r):
+		txctrl(tc), msg(m), empty_code(), smallbuf(b), revision(r) {}
 
 	bool account_exists(const evmc_address& addr) {
 		const account_info& info = txctrl->get_account(addr);
