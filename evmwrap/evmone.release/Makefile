@@ -1,8 +1,12 @@
 OBJS = \
    analysis.o \
-   evmone.o \
+   baseline.o \
+   baseline_instruction_table.o \
    execution.o \
    instructions.o \
+   instructions_calls.o \
+   tracing.o \
+   vm.o \
 
 all : ${OBJS}
 
@@ -11,3 +15,4 @@ all : ${OBJS}
 
 clean:
 	rm *.o
+

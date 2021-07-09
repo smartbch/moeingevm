@@ -227,6 +227,13 @@ public:
 	void pop_log() {
 		logs.pop_back();
 	}
+	bool has_account(const evmc_address& addr) {
+		return accounts.find(addr) != accounts.end();
+	}
+	bool has_value(uint64_t sequence, const evmc_bytes32& key) {
+		storage_key k = skey(sequence, key);
+		return values.find(k) != values.end();
+	}
 	// Before the transaction exits, the Go environment should examine how this cached subset was modified.
 	// The modified entries in cache are marked as "dirty".
 	// These functions collect the modifications and then we pass them to Go by calling collect_result_fn.
@@ -406,6 +413,13 @@ public:
 	}
 	const bytecode_entry& get_bytecode_entry(const evmc_address& addr) {
 		return cstate.get_bytecode_entry(addr);
+	}
+	enum evmc_access_status access_account(const evmc_address& address) {
+		return cstate.has_account(address) ? EVMC_ACCESS_WARM : EVMC_ACCESS_COLD;
+	}
+	enum evmc_access_status access_storage(const evmc_address& addr, const evmc_bytes32& key) {
+		const account_info& info = cstate.get_account(addr);
+		return cstate.has_value(info.sequence, key) ? EVMC_ACCESS_WARM : EVMC_ACCESS_COLD;
 	}
 	evmc_storage_status set_value(const evmc_address& addr, const evmc_bytes32& key, bytes_info value);
 	evmc_storage_status set_value(uint64_t sequence, const evmc_bytes32& key, bytes_info value);

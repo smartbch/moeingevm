@@ -16,7 +16,7 @@
 #include <evmc/evmc.h>
 #include <evmc/utils.h>
 
-#if __cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -53,7 +53,7 @@ enum evmc_opcode
     OP_SHR = 0x1c,
     OP_SAR = 0x1d,
 
-    OP_SHA3 = 0x20,
+    OP_KECCAK256 = 0x20,
 
     OP_ADDRESS = 0x30,
     OP_BALANCE = 0x31,
@@ -80,6 +80,7 @@ enum evmc_opcode
     OP_GASLIMIT = 0x45,
     OP_CHAINID = 0x46,
     OP_SELFBALANCE = 0x47,
+    OP_BASEFEE = 0x48,
 
     OP_POP = 0x50,
     OP_MLOAD = 0x51,
@@ -219,7 +220,7 @@ EVMC_EXPORT const struct evmc_instruction_metrics* evmc_get_instruction_metrics_
  */
 EVMC_EXPORT const char* const* evmc_get_instruction_names_table(enum evmc_revision revision);
 
-#if __cplusplus
+#ifdef __cplusplus
 }
 #endif
 

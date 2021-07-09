@@ -1,1 +1,1 @@
-from https://github.com/ethereum/evmone/releases/tag/v0.5.0
+from https://github.com/ethereum/evmone/releases/tag/v0.8.0

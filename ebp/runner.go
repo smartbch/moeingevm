@@ -459,7 +459,8 @@ func runTxHelper(idx int, currBlock *types.BlockInfo, estimateGas bool) int64 {
 		C.size_t(len(runner.Tx.Data)),
 		&bi,
 		C.int(idx),
-		C.bool(estimateGas))
+		C.bool(estimateGas),
+		C.EVMC_ISTANBUL)
 	return int64(gasEstimated)
 }
 
@@ -499,14 +500,14 @@ func StatusToStr(status int) string {
 		return "contract-validation-failure"
 	case int(C.EVMC_ARGUMENT_OUT_OF_RANGE):
 		return "argument-out-of-range"
-	case int(C.EVMC_PRECOMPILED_FAILED):
-		return "precompiled-contract-failed"
-	case int(C.EVMC_RECREATE_CONTRACT):
-		return "recreate-existing-contract"
-	case int(C.EVMC_EXCEED_MAX_CODE_SIZE):
-		return "exceed-max-code-size"
-	case int(C.EVMC_BALANCE_NOT_ENOUGH):
-		return "balance-not-enough"
+	case int(C.EVMC_INSUFFICIENT_BALANCE):
+		return "insufficient-balance"
+	case int(C.EVMC_INTERNAL_ERROR):
+		return "internal-error"
+	case int(C.EVMC_REJECTED):
+		return "rejected"
+	case int(C.EVMC_OUT_OF_MEMORY):
+		return "out-of-memory"
 	case types.IGNORE_TOO_OLD_TX:
 		return "too-old-and-ignored"
 	case types.ACCOUNT_NOT_EXIST:

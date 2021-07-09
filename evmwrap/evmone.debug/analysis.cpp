@@ -1,6 +1,6 @@
 // evmone: Fast Ethereum Virtual Machine implementation
-// Copyright 2019 Pawel Bylica.
-// Licensed under the Apache License, Version 2.0.
+// Copyright 2019 The evmone Authors.
+// SPDX-License-Identifier: Apache-2.0
 
 #include "analysis.hpp"
 #include "opcodes_helpers.h"
@@ -39,12 +39,12 @@ struct block_analysis
     }
 };
 
-code_analysis analyze(evmc_revision rev, const uint8_t* code, size_t code_size) noexcept
+AdvancedCodeAnalysis analyze(evmc_revision rev, const uint8_t* code, size_t code_size) noexcept
 {
     const auto& op_tbl = get_op_table(rev);
     const auto opx_beginblock_fn = op_tbl[OPX_BEGINBLOCK].fn;
 
-    code_analysis analysis;
+    AdvancedCodeAnalysis analysis;
 
     const auto max_instrs_size = code_size + 1;
     analysis.instrs.reserve(max_instrs_size);
@@ -62,7 +62,7 @@ code_analysis analyze(evmc_revision rev, const uint8_t* code, size_t code_size) 
 
     while (code_pos != code_end)
     {
-        auto pc = code_pos - code;  //!!
+        auto pc = code_pos - code;
         const auto opcode = *code_pos++;
         const auto& opcode_info = op_tbl[opcode];
 
@@ -81,8 +81,7 @@ code_analysis analyze(evmc_revision rev, const uint8_t* code, size_t code_size) 
                 static_cast<int32_t>(analysis.instrs.size() - 1));
         }
         else
-            analysis.instrs.emplace_back(opcode_info.fn, opcode, pc);  //!!
-	
+            analysis.instrs.emplace_back(opcode_info.fn, opcode, pc);
 
         auto& instr = analysis.instrs.back();
 
@@ -121,7 +120,6 @@ code_analysis analyze(evmc_revision rev, const uint8_t* code, size_t code_size) 
 
             auto& push_value = analysis.push_values.emplace_back();
             const auto push_value_bytes = reinterpret_cast<uint8_t*>(intx::as_words(push_value));
-	    
             auto insert_pos = &push_value_bytes[push_size - 1];
 
             // Copy bytes to the deticated storage in the order to match native endianness.

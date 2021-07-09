@@ -1,1 +1,1 @@
-from https://github.com/chfast/intx/releases/tag/v0.5.1
+from https://github.com/chfast/intx/releases/tag/v0.6.0

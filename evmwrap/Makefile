@@ -1,5 +1,5 @@
  
-SUBDIRS = evmone sha256 ripemd160 keccak/src host_bridge
+SUBDIRS = evmone sha256 ripemd160 keccak/src evmc/hex evmc/instructions host_bridge
 
 .PHONY: all
 all:

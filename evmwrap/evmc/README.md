@@ -1,1 +1,1 @@
-from https://github.com/ethereum/evmc/releases/tag/v7.4.0
+from https://github.com/ethereum/evmc/releases/tag/v9.0.0

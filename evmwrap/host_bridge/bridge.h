@@ -138,23 +138,24 @@ typedef void (*bridge_call_precompiled_contract_fn)(struct evmc_address* contrac
 // Since we want to compile evmwrap into a dynamic library (.so), it cannot have unlinked external functions.
 // Thus, there is only one way to allow C to call Go: pass function pointers from Go to C.
 // The following bridge_*_fn parameters are doing this job.
-int64_t zero_depth_call(evmc_bytes32 gas_price,
-                        int64_t gas_limit,
-                        const struct evmc_address* destination,
-                        const struct evmc_address* sender,
-                        const struct evmc_bytes32* value,
-                        const uint8_t* input_data,
-                        size_t input_size,
-                        const struct block_info* block,
-                        int handler,
-		        bool need_gas_estimation,
-                        bridge_get_creation_counter_fn,
-                        bridge_get_account_info_fn,
-                        bridge_get_bytecode_fn,
-                        bridge_get_value_fn,
-                        bridge_get_block_hash_fn,
-                        bridge_collect_result_fn,
-                        bridge_call_precompiled_contract_fn);
+int64_t zero_depth_call(evmc_uint256be gas_price,
+                     int64_t gas_limit,
+                     const evmc_address* destination,
+                     const evmc_address* sender,
+                     const evmc_uint256be* value,
+                     const uint8_t* input_data,
+                     size_t input_size,
+		     const struct block_info* block,
+		     int handler,
+		     bool need_gas_estimation,
+		     enum evmc_revision revision,
+		     bridge_get_creation_counter_fn get_creation_counter_fn,
+		     bridge_get_account_info_fn get_account_info_fn,
+		     bridge_get_bytecode_fn get_bytecode_fn,
+		     bridge_get_value_fn get_value_fn,
+		     bridge_get_block_hash_fn get_block_hash_fn,
+		     bridge_collect_result_fn collect_result_fn,
+		     bridge_call_precompiled_contract_fn call_precompiled_contract_fn);
 
 #ifdef __cplusplus
 }
