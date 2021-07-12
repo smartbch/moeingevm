@@ -418,9 +418,6 @@ evmc_result evmc_host_context::run_precompiled_contract(const evmc_address& addr
 		return run_precompiled_contract_sep101();
 	} else if(id == SEP206_CONTRACT_ID) {
 		return run_precompiled_contract_sep206();
-	} else if(id == STAKING_CONTRACT_ID) {
-		// The staking contract cannot be called by other contracts
-		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	// the others use golang implementations
 	int ret_value, out_of_gas, osize;
