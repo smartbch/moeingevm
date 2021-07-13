@@ -83,11 +83,6 @@ func (c *Context) SetAccount(address common.Address, acc *AccountInfo) {
 	c.Rbt.Set(k, acc.Bytes())
 }
 
-func (c *Context) DeleteAccount(address common.Address) {
-	k := GetAccountKey(address)
-	c.Rbt.Delete(k)
-}
-
 func (c *Context) GetCode(contract common.Address) *BytecodeInfo {
 	k := GetBytecodeKey(contract)
 	v := c.Rbt.Get(k)
@@ -95,11 +90,6 @@ func (c *Context) GetCode(contract common.Address) *BytecodeInfo {
 		return NewBytecodeInfo(v)
 	}
 	return nil
-}
-
-func (c *Context) SetCode(contract common.Address, code *BytecodeInfo) {
-	k := GetBytecodeKey(contract)
-	c.Rbt.Set(k, code.Bytes())
 }
 
 func (c *Context) GetStorageAt(seq uint64, key string) []byte {
@@ -215,21 +205,16 @@ func (c *Context) CheckNonce(sender common.Address, nonce uint64) (*AccountInfo,
 	return acc, nil
 }
 
-func (c *Context) IncrNonce(sender common.Address, acc *AccountInfo) {
-	acc.UpdateNonce(acc.Nonce() + 1)
-	c.SetAccount(sender, acc)
-}
-
 func (c *Context) DeductTxFee(sender common.Address, acc *AccountInfo, txGas uint64, gasPrice *uint256.Int) error {
 	acc.UpdateNonce(acc.Nonce() + 1)
 	var gasFee, gas uint256.Int
 	gas.SetUint64(txGas)
 	gasFee.Mul(&gas, gasPrice)
 	x := acc.Balance()
-	x.Sub(x, &gasFee)
-	if x.Cmp(acc.Balance()) == 1 {
+	if x.Cmp(&gasFee) < 0 {
 		return errors.New("account balance is not enough for fee")
 	}
+	x.Sub(x, &gasFee)
 	acc.UpdateBalance(x)
 	c.SetAccount(sender, acc)
 	return nil
@@ -249,7 +234,7 @@ func (c *Context) BasicQueryLogs(address common.Address, topics []common.Hash,
 
 	var rawAddress [20]byte = address
 	rawTopics := FromGethHashes(topics)
-	c.Db.BasicQueryLogs(&rawAddress, rawTopics, startHeight, endHeight, func(data []byte) bool {
+	c.Db.BasicQueryLogs(&rawAddress, rawTopics, startHeight, endHeight, func(data []byte) (needMore bool) {
 		if data == nil {
 			err = ErrTooManyEntries
 			return false
@@ -323,7 +308,7 @@ func (c *Context) QueryTxBySrc(addr common.Address, startHeight, endHeight, limi
 		if _, err = tx.UnmarshalMsg(data); err != nil {
 			return false
 		}
-		if bytes.Equal(tx.From[:], addr[:]) { // for hash-conflicts corner case
+		if bytes.Equal(tx.From[:], addr[:]) { // compare them to prevent hash-conflict corner case
 			txs = append(txs, &tx)
 		}
 		if limit > 0 && len(txs) >= int(limit) {
@@ -344,7 +329,7 @@ func (c *Context) QueryTxByDst(addr common.Address, startHeight, endHeight, limi
 		if _, err = tx.UnmarshalMsg(data); err != nil {
 			return false
 		}
-		if bytes.Equal(tx.To[:], addr[:]) { // for hash-conflicts corner case
+		if bytes.Equal(tx.To[:], addr[:]) { // compare them to prevent hash-conflict corner case
 			txs = append(txs, &tx)
 		}
 		if limit > 0 && len(txs) >= int(limit) {
@@ -365,7 +350,7 @@ func (c *Context) QueryTxByAddr(addr common.Address, startHeight, endHeight, lim
 		if _, err = tx.UnmarshalMsg(data); err != nil {
 			return false
 		}
-		if bytes.Equal(tx.From[:], addr[:]) || bytes.Equal(tx.To[:], addr[:]) { // for hash-conflicts corner case
+		if bytes.Equal(tx.From[:], addr[:]) || bytes.Equal(tx.To[:], addr[:]) {
 			txs = append(txs, &tx)
 		}
 		if limit > 0 && len(txs) >= int(limit) {
@@ -393,19 +378,19 @@ func (c *Context) GetTxListByHeightWithRange(height uint32, start, end int) (txs
 	return txs, err
 }
 
-// return the times addr acts as a to-address of a transaction
+// return the times addr acts as the to-address of a transaction
 func (c *Context) GetToAddressCount(addr common.Address) int64 {
 	k := append([]byte{modbtypes.TO_ADDR_KEY}, addr[:]...)
 	return c.Db.QueryNotificationCounter(k)
 }
 
-// return the times addr acts as a from-address of a transaction
+// return the times addr acts as the from-address of a transaction
 func (c *Context) GetFromAddressCount(addr common.Address) int64 {
 	k := append([]byte{modbtypes.FROM_ADDR_KEY}, addr[:]...)
 	return c.Db.QueryNotificationCounter(k)
 }
 
-// return the times addr acts as a to-address of a SEP20 Transfer event at some contract
+// return the times addr acts as the to-address of a SEP20 Transfer event at some contract
 func (c *Context) GetSep20ToAddressCount(contract common.Address, addr common.Address) int64 {
 	var zero12 [12]byte
 	k := append([]byte{modbtypes.TRANS_TO_ADDR_KEY}, contract[:]...)
