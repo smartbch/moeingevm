@@ -46,7 +46,7 @@ type txEngine struct {
 	currentBlock *types.BlockInfo
 
 	cumulativeGasUsed   uint64
-	cumulativeGasRefund *uint256.Int
+	cumulativeFeeRefund *uint256.Int
 	cumulativeGasFee    *uint256.Int
 }
 
@@ -299,7 +299,7 @@ func (exec *txEngine) recordInvalidTx(info *preparedInfo) {
 func (exec *txEngine) Execute(currBlock *types.BlockInfo) {
 	exec.committedTxs = exec.committedTxs[:0]
 	exec.cumulativeGasUsed = 0
-	exec.cumulativeGasRefund = uint256.NewInt()
+	exec.cumulativeFeeRefund = uint256.NewInt()
 	exec.cumulativeGasFee = uint256.NewInt()
 	exec.currentBlock = currBlock
 	startKey, endKey := exec.getStandbyQueueRange()
@@ -389,7 +389,6 @@ func (exec *txEngine) runTxInParallel(txRange *TxRange, txBundle []types.TxToRun
 				return
 			}
 			Runners[myIdx] = &TxRunner{
-				id:  myIdx,
 				Ctx: exec.cleanCtx.WithRbtCopy(),
 				Tx:  &txBundle[myIdx],
 			}
@@ -485,7 +484,7 @@ func (exec *txEngine) collectCommittableTxs(committableRunnerList []*TxRunner) {
 	var logIndex uint
 	for idx, runner := range committableRunnerList {
 		exec.cumulativeGasUsed += runner.GasUsed
-		exec.cumulativeGasRefund.Add(exec.cumulativeGasRefund, &runner.GasRefund)
+		exec.cumulativeFeeRefund.Add(exec.cumulativeFeeRefund, &runner.FeeRefund)
 		exec.cumulativeGasFee.Add(exec.cumulativeGasFee, runner.GetGasFee())
 		tx := &types.Transaction{
 			Hash:              runner.Tx.HashID,
@@ -590,11 +589,11 @@ func (exec *txEngine) CollectedTxsCount() int {
 	return len(exec.txList)
 }
 
-func (exec *txEngine) GasUsedInfo() (gasUsed uint64, gasRefund, gasFee uint256.Int) {
+func (exec *txEngine) GasUsedInfo() (gasUsed uint64, feeRefund, gasFee uint256.Int) {
 	if exec.cumulativeGasFee == nil {
-		return exec.cumulativeGasUsed, *exec.cumulativeGasRefund, uint256.Int{}
+		return exec.cumulativeGasUsed, *exec.cumulativeFeeRefund, uint256.Int{}
 	}
-	return exec.cumulativeGasUsed, *exec.cumulativeGasRefund, *exec.cumulativeGasFee
+	return exec.cumulativeGasUsed, *exec.cumulativeFeeRefund, *exec.cumulativeGasFee
 }
 
 func (exec *txEngine) StandbyQLen() int {

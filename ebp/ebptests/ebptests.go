@@ -56,6 +56,8 @@ var (
 var IgnoreFiles []string
 
 func runTestCase(filename string, theCase *tc.TestCase, printLog bool) {
+	ebp.AdjustGasUsed = false // to be compatible with EVM test vectors
+
 	for _, f := range IgnoreFiles {
 		if strings.Contains(filename, f) {
 			fmt.Printf("Ignore File: %s\n", filename)

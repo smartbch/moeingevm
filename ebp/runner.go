@@ -19,7 +19,6 @@ import (
 import "C"
 
 type (
-	//bytes_info               = C.struct_bytes_info
 	evmc_address             = C.struct_evmc_address
 	evmc_bytes32             = C.struct_evmc_bytes32
 	evmc_result              = C.struct_evmc_result
@@ -44,9 +43,9 @@ const (
 	RpcRunnersIdStart int = 10000
 	RpcRunnersCount   int = 256
 	SMALL_BUF_SIZE    int = int(C.SMALL_BUF_SIZE)
-
-	AdjustGasUsed = false
 )
+
+var AdjustGasUsed = true // It's a global variable because in tests we must change it to false to be compatible
 
 // Its usage is similar with Runners. Runners are for transactions in block. RpcRunners are for transactions
 // in Web3 RPC: call and estimateGas.
@@ -60,6 +59,7 @@ func (sl *spinLock) Unlock() {
 	atomic.StoreUint32((*uint32)(sl), 0)
 }
 
+// try to abtain a lock and return false when failed
 func (sl *spinLock) TryLock() bool {
 	return atomic.CompareAndSwapUint32((*uint32)(sl), 0, 1)
 }
@@ -87,10 +87,9 @@ func getRunner(i int) (runner *TxRunner) {
 }
 
 type TxRunner struct {
-	id        int64
 	Ctx       *types.Context
 	GasUsed   uint64
-	GasRefund uint256.Int
+	FeeRefund uint256.Int
 	Tx        *types.TxToRun
 	Logs      []types.EvmLog
 	Status    int
@@ -161,7 +160,7 @@ func (runner *TxRunner) changeCreationCounter(chg_counter *changed_creation_coun
 func (runner *TxRunner) getAccountInfo(addr_ptr *evmc_address, balance *evmc_bytes32, nonce *C.uint64_t, sequence *C.uint64_t) {
 	acc := runner.Ctx.GetAccount(toAddress(addr_ptr))
 	if acc == nil {
-		*nonce = ^C.uint64_t(0)
+		*nonce = ^C.uint64_t(0) // nonce with all ones means a non-existant account
 		return
 	}
 	writeCBytes32WithSlice(balance, acc.BalanceSlice())
@@ -223,7 +222,7 @@ func (runner *TxRunner) changeValue(chg_value *changed_value) {
 	if chg_value.value_size == 0 {
 		runner.Ctx.Rbt.Delete(k)
 	} else {
-		runner.Ctx.Rbt.Set(k, []byte(C.GoStringN(chg_value.value_data, chg_value.value_size)))
+		runner.Ctx.Rbt.Set(k, C.GoBytes(unsafe.Pointer(chg_value.value_data), chg_value.value_size))
 	}
 }
 
@@ -247,9 +246,8 @@ func (runner *TxRunner) refundGasFee(ret_value *evmc_result, refund C.uint64_t) 
 			gasUsed = (runner.Tx.Gas + gasUsed) / 2
 		}
 	}
-	//fmt.Printf("runner.Tx.Gas %d uint64(ret_value.gas_left) %d\n", runner.Tx.Gas, uint64(ret_value.gas_left))
 	half := (gasUsed + 1) / 2
-	if gasUsed < uint64(refund)+half {
+	if gasUsed < uint64(refund)+half { // can refund no more than half
 		gasUsed = half
 	} else {
 		gasUsed = gasUsed - uint64(refund)
@@ -265,7 +263,7 @@ func (runner *TxRunner) refundGasFee(ret_value *evmc_result, refund C.uint64_t) 
 	x.Add(x, &returnedGasFee)
 	copy(acc.BalanceSlice(), utils.U256ToSlice32(x))
 	runner.Ctx.Rbt.Set(k, acc.Bytes())
-	runner.GasRefund = returnedGasFee
+	runner.FeeRefund = returnedGasFee
 	runner.GasUsed = gasUsed
 }
 func (runner *TxRunner) GetGasFee() *uint256.Int {
@@ -287,7 +285,7 @@ func convertLog(log *added_log) (res types.EvmLog) {
 		res.Topics = append(res.Topics, toHash(log.topic4))
 	}
 	res.Address = toAddress(log.contract_addr)
-	res.Data = []byte(C.GoStringN(log.data, log.size))
+	res.Data = C.GoBytes(unsafe.Pointer(log.data), log.size)
 	return
 }
 
@@ -391,20 +389,12 @@ func RunTxForRpc(currBlock *types.BlockInfo, estimateGas bool, runner *TxRunner)
 //call the C entrance function 'zero_depth_call_wrap'.
 func runTxHelper(idx int, currBlock *types.BlockInfo, estimateGas bool) int64 {
 	runner := getRunner(idx)
-	//fmt.Printf("idx:%d, runner.id:%d\n", idx, runner.id)
-	//	fmt.Printf(`run tx before:
-	//idx:%d
-	//from:%s
-	//to:%s
-	//nonce:%d
-	//value :%d
-	//`, idx, runner.Tx.From.String(), runner.Tx.To.String(), runner.Tx.Nonce, runner.Tx.Value)
-	if runner.Tx.Height+types.TOO_OLD_THRESHOLD < uint64(currBlock.Number) {
+	if !runner.ForRpc && runner.Tx.Height+types.TOO_OLD_THRESHOLD < uint64(currBlock.Number) {
 		runner.Status = types.IGNORE_TOO_OLD_TX
 		return 0
 	}
 	acc, err := runner.Ctx.CheckNonce(runner.Tx.From, runner.Tx.Nonce)
-	if err != nil && !runner.ForRpc {
+	if !runner.ForRpc && err != nil { // For RPC, we do not care about sender and its nonce
 		if err == types.ErrAccountNotExist {
 			runner.Status = types.ACCOUNT_NOT_EXIST
 		} else if err == types.ErrNonceTooLarge {
@@ -449,7 +439,6 @@ func runTxHelper(idx int, currBlock *types.BlockInfo, estimateGas bool) int64 {
 		return int64(gasUsed)
 	}
 
-	//fmt.Println("run tx")
 	gasEstimated := C.zero_depth_call_wrap(gas_price,
 		C.int64_t(runner.Tx.Gas),
 		&to,

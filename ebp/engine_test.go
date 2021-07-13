@@ -83,6 +83,7 @@ account2 send txs(nonce): 0
 canCommitTxs: account1=>{0}; account2=>{0}
 */
 func TestTxEngine_DifferentAccount(t *testing.T) {
+	AdjustGasUsed = false
 	trunk, root := prepareTruck()
 	defer closeTestCtx(root)
 	e := NewEbpTxExec(1, 100, 2, 10, &testcase.DumbSigner{})
@@ -126,6 +127,7 @@ account2 send txs(nonce): 0
 canCommitTxs: account1=>{0,1,2}; account2=>{0}
 */
 func TestTxEngine_SameAccount(t *testing.T) {
+	AdjustGasUsed = false
 	trunk, root := prepareTruck()
 	defer closeTestCtx(root)
 	e := NewEbpTxExec(5, 100, 2, 10, &testcase.DumbSigner{})
@@ -321,6 +323,7 @@ func TestTxCountBiggerThanRunnerCount(t *testing.T) {
 }
 
 func TestAccBalanceNotEnough(t *testing.T) {
+	AdjustGasUsed = false
 	trunk, root := prepareTruck()
 	defer closeTestCtx(root)
 	//only 1 runner

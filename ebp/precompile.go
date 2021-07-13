@@ -31,6 +31,7 @@ func call_precompiled_contract(contract_addr *evmc_address,
 	out_of_gas *C.int,
 	output_ptr *small_buffer,
 	output_size *C.int) {
+	*output_size = 0
 	addr := toAddress(contract_addr)
 	contract, ok := vm.PrecompiledContractsIstanbul[addr]
 	if !ok && PredefinedSystemContractExecutor != nil &&
@@ -45,7 +46,6 @@ func call_precompiled_contract(contract_addr *evmc_address,
 	}
 	input := C.GoBytes(input_ptr, input_size)
 	gasRequired := C.uint64_t(contract.RequiredGas(input))
-	//fmt.Printf("Why gasRequired %d gas_left %d input_size%d %#v\n", gasRequired, *gas_left, input_size, input)
 	if gasRequired > *gas_left {
 		*ret_value = 0
 		*out_of_gas = 1
@@ -60,17 +60,13 @@ func call_precompiled_contract(contract_addr *evmc_address,
 		return
 	}
 	size := len(output)
-	if size > SMALL_BUF_SIZE {
+	if size > SMALL_BUF_SIZE { // limit the copied data to prevent overflow
 		size = SMALL_BUF_SIZE
 	}
 	*output_size = C.int(size)
-	//fmt.Printf("PRECOM %s %d  %d ", common.Address(addr).String(), len(output), size)
 	for i := 0; i < size; i++ {
 		output_ptr.data[i] = C.uint8_t(output[i])
-		//fmt.Printf("%x", int(output[i]));
 	}
-	//fmt.Printf("\n");
 	*ret_value = 1
 	*out_of_gas = 0
-	//return
 }
