@@ -186,15 +186,11 @@ bytes rlp_encode(const std::vector<bytes>& input_vec) {
 	return rlp_encode_length(output.size(), 0xc0) + output;
 }
 
-bytes rlp_encode_bytes(const uint8_t* data, size_t size) {
-	size_t start = 0;
-	for(; start < size; start++) { // the leading zeros are ignored
-		if(data[start] != 0) break;
-	}
+bytes rlp_encode_address(const evmc_address& addr) {
 	bytes result;
-	result.reserve(size - start + 1);
-	for(; start < size; start++) {
-		result.append(1, char(data[start]));
+	result.reserve(20);
+	for(int i=0; i < sizeof(evmc_address); i++) {
+		result.append(1, char(addr.bytes[i]));
 	}
 	return result;
 }
@@ -202,7 +198,7 @@ bytes rlp_encode_bytes(const uint8_t* data, size_t size) {
 // calculate the created contract's address of CREATE instruction
 evmc_address create_contract_addr(const evmc_address& creater, uint64_t nonce) {
 	std::vector<bytes> str_vec(2);
-	str_vec[0] = rlp_encode_bytes(&creater.bytes[0], sizeof(evmc_address));
+	str_vec[0] = rlp_encode_address(creater);
 	str_vec[1] = rlp_encode_uint(nonce);
 	auto s = rlp_encode(str_vec);
 	ethash::hash256 hash = ethash::keccak256(s.c_str(), s.size());
