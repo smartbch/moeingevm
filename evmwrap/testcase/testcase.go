@@ -5,12 +5,14 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"math/big"
 	"os"
 	"os/exec"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -139,6 +141,25 @@ func GetWorldStateFromMads(mads *moeingads.MoeingADS) *WorldState {
 		}
 	})
 	return &world
+}
+
+func CompareWorldState(stateA, stateB *WorldState) (bool, error) {
+	if !reflect.DeepEqual(stateA.Accounts, stateB.Accounts) {
+		return false, errors.New("accounts not equal")
+	}
+	if !reflect.DeepEqual(stateA.Bytecodes, stateB.Bytecodes) {
+		return false, errors.New("bytecode not equal")
+	}
+	if !reflect.DeepEqual(stateA.Values, stateB.Values) {
+		return false, errors.New("value not equal")
+	}
+	if stateA.BlockHashes != stateB.BlockHashes {
+		return false, errors.New("block hash not equal")
+	}
+	if stateA.CreationCounters != stateB.CreationCounters {
+		return false, errors.New("creation counters not equal")
+	}
+	return true, nil
 }
 
 func UpdateWorldState(world *WorldState, key, value []byte) {
