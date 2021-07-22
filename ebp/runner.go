@@ -202,8 +202,9 @@ func (runner *TxRunner) changeBytecode(chg_bytecode *changed_bytecode) {
 	if chg_bytecode.bytecode_size == 0 {
 		runner.Ctx.Rbt.Delete(k)
 	} else {
-		bz := make([]byte, 32, 32+chg_bytecode.bytecode_size)
-		writeSliceWithCBytes32(bz[:32], chg_bytecode.codehash)
+		bz := make([]byte, 33, 33+chg_bytecode.bytecode_size)
+		bz[0] = 0 // version byte is zero
+		writeSliceWithCBytes32(bz[1:33], chg_bytecode.codehash)
 		bz = append(bz, C.GoStringN(chg_bytecode.bytecode_data, chg_bytecode.bytecode_size)...)
 		runner.Ctx.Rbt.Set(k, bz)
 	}

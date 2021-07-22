@@ -28,9 +28,9 @@ func WriteWorldStateToRabbit(rbt rabbit.RabbitStore, world *tc.WorldState) {
 	}
 	for addr, bi := range world.Bytecodes {
 		k := types.GetBytecodeKey(addr)
-		bz := make([]byte, 32+len(bi.Bytecode))
-		copy(bz[:32], bi.Codehash[:])
-		copy(bz[32:], bi.Bytecode)
+		bz := make([]byte, 33+len(bi.Bytecode))
+		copy(bz[1:33], bi.Codehash[:])
+		copy(bz[33:], bi.Bytecode)
 		rbt.Set(k, bz)
 	}
 	for addr, acc := range world.Accounts {

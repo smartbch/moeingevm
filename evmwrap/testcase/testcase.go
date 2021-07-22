@@ -177,8 +177,8 @@ func UpdateWorldState(world *WorldState, key, value []byte) {
 	} else if key[0] == types.BYTECODE_KEY {
 		var addr [20]byte
 		copy(addr[:], key[1:])
-		bi := BytecodeInfo{Bytecode: append([]byte{}, value[32:]...)}
-		copy(bi.Codehash[:], key[:32])
+		bi := BytecodeInfo{Bytecode: value[33:]}
+		copy(bi.Codehash[:], value[1:33]) // value[0] is version byte
 		world.Bytecodes[addr] = bi
 	} else if key[0] == types.VALUE_KEY {
 		skey := StorageKey{AccountSeq: binary.BigEndian.Uint64(key[1:9])}

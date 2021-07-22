@@ -5,18 +5,18 @@ type BytecodeInfo struct {
 }
 
 func NewBytecodeInfo(data []byte) *BytecodeInfo {
-	if len(data) <= 32 {
+	if len(data) <= 33 {
 		panic("Invalid length for BytecodeInfo")
 	}
 	return &BytecodeInfo{data: data}
 }
 
 func (info *BytecodeInfo) CodeHashSlice() []byte {
-	return info.data[0:32]
+	return info.data[1:33]
 }
 
 func (info *BytecodeInfo) BytecodeSlice() []byte {
-	return info.data[32:]
+	return info.data[33:]
 }
 
 func (info *BytecodeInfo) Bytes() []byte {

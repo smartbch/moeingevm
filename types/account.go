@@ -12,26 +12,26 @@ type AccountInfo struct {
 }
 
 func NewAccountInfo(data []byte) *AccountInfo {
-	if len(data) != 48 {
+	if len(data) != 49 {
 		panic("Invalid length for AccountInfo")
 	}
 	return &AccountInfo{data: data}
 }
 
 func ZeroAccountInfo() *AccountInfo {
-	return &AccountInfo{data: make([]byte, 48)}
+	return &AccountInfo{data: make([]byte, 49)}
 }
 
 func (info *AccountInfo) BalanceSlice() []byte {
-	return info.data[0:32]
+	return info.data[1:33]
 }
 
 func (info *AccountInfo) NonceSlice() []byte {
-	return info.data[32:40]
+	return info.data[33:41]
 }
 
 func (info *AccountInfo) SequenceSlice() []byte {
-	return info.data[40:48]
+	return info.data[41:49]
 }
 
 func (info *AccountInfo) Bytes() []byte {
