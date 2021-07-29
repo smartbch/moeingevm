@@ -46,4 +46,3 @@ func collectAllGethLogs(mdbBlock *modbtypes.Block) []*gethtypes.Log {
 	}
 	return logs
 }
-
