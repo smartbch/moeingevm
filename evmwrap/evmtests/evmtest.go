@@ -214,7 +214,7 @@ func (collector *ResultCollector) changeValue(chg_value *changed_value) {
 
 func (collector *ResultCollector) deductGasFee() {
 	var gasFeeMax uint256.Int
-	gasFeeMax.Mul(uint256.NewInt().SetUint64(collector.currTx.Gas), &collector.currTx.GasPrice)
+	gasFeeMax.Mul(uint256.NewInt(0).SetUint64(collector.currTx.Gas), &collector.currTx.GasPrice)
 	accounts := collector.state.Accounts
 	x := &uint256.Int{}
 	x.Set(&accounts[collector.currTx.From].Balance)
@@ -236,14 +236,14 @@ func (collector *ResultCollector) refundGasFee(ret_value *evmc_result, refund C.
 	accounts := collector.state.Accounts
 
 	var returnedGasFee uint256.Int
-	returnedGasFee.Mul(uint256.NewInt().SetUint64(collector.currTx.Gas-gasUsed), &collector.currTx.GasPrice)
+	returnedGasFee.Mul(uint256.NewInt(0).SetUint64(collector.currTx.Gas-gasUsed), &collector.currTx.GasPrice)
 	x := &uint256.Int{}
 	x.Set(&accounts[collector.currTx.From].Balance)
 	x.Add(x, &returnedGasFee)
 	accounts[collector.currTx.From].Balance.Set(x)
 
 	var gasFee uint256.Int
-	gasFee.Mul(uint256.NewInt().SetUint64(gasUsed), &collector.currTx.GasPrice)
+	gasFee.Mul(uint256.NewInt(0).SetUint64(gasUsed), &collector.currTx.GasPrice)
 	x.Set(&accounts[collector.currBlock.Coinbase].Balance)
 	x.Add(x, &gasFee)
 	accounts[collector.currBlock.Coinbase].Balance.Set(x)

@@ -137,7 +137,7 @@ func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice, maxTxGasLimit uint
 					continue
 				}
 				entry.addr2nonce[sender]++
-				gasFee := uint256.NewInt().SetUint64(info.tx.Gas)
+				gasFee := uint256.NewInt(0).SetUint64(info.tx.Gas)
 				gasFee.Mul(gasFee, utils.U256FromSlice32(info.tx.GasPrice[:]))
 				err := SubSenderAccBalance(entry.ctx, sender, gasFee)
 				if err != nil {
@@ -157,7 +157,7 @@ func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice, maxTxGasLimit uint
 	// the value of exec.parallelNum and the speeds of goroutines must have
 	// no effects on the order of TXs in standby queue.
 	ctx = exec.cleanCtx.WithRbtCopy()
-	totalGasFee := uint256.NewInt()
+	totalGasFee := uint256.NewInt(0)
 	for i := range ctxAA {
 		totalGasFee.Add(totalGasFee, ctxAA[i].totalGasFee)
 	}
@@ -184,7 +184,7 @@ func (exec *txEngine) parallelReadAccounts(minGasPrice, maxTxGasLimit uint64) (i
 			ctx:         exec.cleanCtx.WithRbtCopy(),
 			accounts:    make([]common.Address, 0, estimatedSize),
 			changed:     false,
-			totalGasFee: uint256.NewInt(),
+			totalGasFee: uint256.NewInt(0),
 			addr2nonce:  make(map[common.Address]uint64, estimatedSize),
 		}
 		for {
@@ -299,8 +299,8 @@ func (exec *txEngine) recordInvalidTx(info *preparedInfo) {
 func (exec *txEngine) Execute(currBlock *types.BlockInfo) {
 	exec.committedTxs = exec.committedTxs[:0]
 	exec.cumulativeGasUsed = 0
-	exec.cumulativeFeeRefund = uint256.NewInt()
-	exec.cumulativeGasFee = uint256.NewInt()
+	exec.cumulativeFeeRefund = uint256.NewInt(0)
+	exec.cumulativeGasFee = uint256.NewInt(0)
 	exec.currentBlock = currBlock
 	startKey, endKey := exec.getStandbyQueueRange()
 	if startKey == endKey {

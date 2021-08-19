@@ -74,7 +74,7 @@ func runTestCase(filename string, theCase *tc.TestCase, printLog bool) {
 	world := &theCase.ImplState
 
 	currBlock := theCase.Blocks[0]
-	blockReward := uint256.NewInt().SetUint64(0)
+	blockReward := uint256.NewInt(0)
 	tc.AddBlockReward(world, currBlock.Coinbase, blockReward)
 
 	// write tc.WorldState to MoeingADS
@@ -109,7 +109,7 @@ func runTestCase(filename string, theCase *tc.TestCase, printLog bool) {
 	trunk.Close(true)
 	txList = txEngine.CommittedTxs()
 	var gasFee uint256.Int
-	gasFee.Mul(uint256.NewInt().SetUint64(txList[0].GasUsed),
+	gasFee.Mul(uint256.NewInt(txList[0].GasUsed),
 		utils.U256FromSlice32(txList[0].GasPrice[:]))
 
 	// create new tc.WorldState according to MoeingADS's content
