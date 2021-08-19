@@ -102,6 +102,11 @@ func (c *Context) SetStorageAt(seq uint64, key string, val []byte) {
 	c.Rbt.Set(k, val)
 }
 
+func (c *Context) DeleteStorageAt(seq uint64, key string) {
+	k := GetValueKey(seq, key)
+	c.Rbt.Delete(k)
+}
+
 func (c *Context) GetCurrBlockBasicInfo() *Block {
 	blk := &Block{}
 	data := c.Rbt.Get([]byte{CURR_BLOCK_KEY})
