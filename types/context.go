@@ -5,9 +5,9 @@ import (
 	"errors"
 	"math"
 
-	"github.com/holiman/uint256"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/holiman/uint256"
 	"github.com/smartbch/moeingads/store/rabbit"
 	modbtypes "github.com/smartbch/moeingdb/types"
 )
@@ -95,6 +95,53 @@ func (c *Context) GetCode(contract common.Address) *BytecodeInfo {
 func (c *Context) GetStorageAt(seq uint64, key string) []byte {
 	k := GetValueKey(seq, key)
 	return c.Rbt.Get(k)
+}
+
+func (c *Context) GetValueAtMapKey(seq uint64, mapSlot string, mapKey string) []byte {
+	key := crypto.Keccak256([]byte(mapSlot), []byte(mapKey))
+	return c.GetStorageAt(seq, string(key))
+}
+
+func (c *Context) DeleteValueAtMapKey(seq uint64, mapSlot string, mapKey string) {
+	key := crypto.Keccak256([]byte(mapSlot), []byte(mapKey))
+	c.DeleteStorageAt(seq, string(key))
+}
+
+func (c *Context) GetAndDeleteValueAtMapKey(seq uint64, mapSlot string, mapKey string) []byte {
+	key := crypto.Keccak256([]byte(mapSlot), []byte(mapKey))
+	res := c.GetStorageAt(seq, string(key))
+	c.DeleteStorageAt(seq, string(key))
+	return res
+}
+
+func (c *Context) GetDynamicArray(seq uint64, arrSlot string) (res [][]byte) {
+	arrLen := uint256.NewInt(0)
+	arrLenBz := c.GetStorageAt(seq, arrSlot)
+	if len(arrLenBz) == 32 {
+		arrLen.SetBytes32(arrLenBz)
+	}
+	startSlot := uint256.NewInt(0).SetBytes32(crypto.Keccak256([]byte(arrSlot)))
+	endSlot := uint256.NewInt(0).Add(startSlot, arrLen)
+	for startSlot.Lt(endSlot) {
+		res = append(res, c.GetStorageAt(seq, string(startSlot.Bytes())))
+		startSlot.AddUint64(startSlot, 1)
+	}
+	return res
+}
+
+func (c *Context) DeleteDynamicArray(seq uint64, arrSlot string) {
+	arrLen := uint256.NewInt(0)
+	arrLenBz := c.GetStorageAt(seq, arrSlot)
+	if len(arrLenBz) == 32 {
+		arrLen.SetBytes32(arrLenBz)
+	}
+	startSlot := uint256.NewInt(0).SetBytes32(crypto.Keccak256([]byte(arrSlot)))
+	endSlot := uint256.NewInt(0).Add(startSlot, arrLen)
+	for startSlot.Lt(endSlot) {
+		c.DeleteStorageAt(seq,  string(startSlot.Bytes()))
+		startSlot.AddUint64(startSlot, 1)
+	}
+	c.DeleteStorageAt(seq, arrSlot)
 }
 
 func (c *Context) SetStorageAt(seq uint64, key string, val []byte) {

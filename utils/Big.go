@@ -7,7 +7,7 @@ import (
 )
 
 func NewU256(u64 uint64) *uint256.Int {
-	u256 := uint256.NewInt()
+	u256 := uint256.NewInt(0)
 	u256.SetUint64(u64)
 	return u256
 }
@@ -37,7 +37,7 @@ func BigIntToSlice32(v *big.Int) []byte {
 }
 
 func U256FromSlice32(arr []byte) *uint256.Int {
-	return uint256.NewInt().SetBytes32(arr)
+	return uint256.NewInt(0).SetBytes32(arr)
 }
 
 func U256ToSlice32(v *uint256.Int) []byte {
