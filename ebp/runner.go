@@ -38,9 +38,6 @@ type (
 var PredefinedContractManager map[common.Address]types.SystemContractExecutor
 
 func RegisterPredefinedContract(ctx *types.Context, address common.Address, executor types.SystemContractExecutor) {
-	if _, ok := PredefinedContractManager[address]; ok {
-		panic(fmt.Sprintf("contract %s already register in PredefinedContractManager", address.String()))
-	}
 	PredefinedContractManager[address] = executor
 	if !executor.IsSystemContract(address) {
 		panic(fmt.Sprintf("contract %s is not system contract", address.String()))
