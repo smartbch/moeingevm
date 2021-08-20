@@ -444,7 +444,7 @@ func runTxHelper(idx int, currBlock *types.BlockInfo, estimateGas bool) int64 {
 	if len(runner.Tx.Data) != 0 {
 		data_ptr = (*C.uint8_t)(unsafe.Pointer(&runner.Tx.Data[0]))
 	}
-	if executor, ok := PredefinedContractManager[runner.Tx.To]; ok {
+	if executor, exist := PredefinedContractManager[runner.Tx.To]; exist {
 		status, logs, gasUsed, out := executor.Execute(runner.Ctx, currBlock, runner.Tx)
 		runner.Status = status
 		runner.Logs = logs
