@@ -2,6 +2,8 @@ package ebp
 
 import (
 	"encoding/binary"
+	"fmt"
+
 	//"fmt"
 	"runtime"
 	"sync/atomic"
@@ -33,7 +35,22 @@ type (
 	small_buffer             = C.struct_small_buffer
 )
 
-var PredefinedSystemContractExecutor types.SystemContractExecutor = nil
+var PredefinedContractManager map[common.Address]types.SystemContractExecutor
+
+func RegisterPredefinedContract(ctx *types.Context, address common.Address, executor types.SystemContractExecutor) {
+	if _, ok := PredefinedContractManager[address]; ok {
+		panic(fmt.Sprintf("contract %s already register in PredefinedContractManager", address.String()))
+	}
+	PredefinedContractManager[address] = executor
+	if !executor.IsSystemContract(address) {
+		panic(fmt.Sprintf("contract %s is not system contract", address.String()))
+	}
+	executor.Init(ctx)
+}
+
+func init(){
+	PredefinedContractManager = make(map[common.Address]types.SystemContractExecutor)
+}
 
 // This is a global variable. The parameter 'collector_handler' passed to zero_depth_call_wrap is
 // an index to select one TxRunner from this global variable.
@@ -430,9 +447,8 @@ func runTxHelper(idx int, currBlock *types.BlockInfo, estimateGas bool) int64 {
 	if len(runner.Tx.Data) != 0 {
 		data_ptr = (*C.uint8_t)(unsafe.Pointer(&runner.Tx.Data[0]))
 	}
-	if PredefinedSystemContractExecutor != nil &&
-		PredefinedSystemContractExecutor.IsSystemContract(runner.Tx.To) {
-		status, logs, gasUsed, out := PredefinedSystemContractExecutor.Execute(runner.Ctx, currBlock, runner.Tx)
+	if executor, ok := PredefinedContractManager[runner.Tx.To]; ok {
+		status, logs, gasUsed, out := executor.Execute(runner.Ctx, currBlock, runner.Tx)
 		runner.Status = status
 		runner.Logs = logs
 		runner.GasUsed = gasUsed
