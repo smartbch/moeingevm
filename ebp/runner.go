@@ -45,7 +45,7 @@ func RegisterPredefinedContract(ctx *types.Context, address common.Address, exec
 	executor.Init(ctx)
 }
 
-func init(){
+func init() {
 	PredefinedContractManager = make(map[common.Address]types.SystemContractExecutor)
 }
 

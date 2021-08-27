@@ -98,17 +98,17 @@ func (c *Context) GetStorageAt(seq uint64, key string) []byte {
 }
 
 func (c *Context) GetValueAtMapKey(seq uint64, mapSlot string, mapKey string) []byte {
-	key := crypto.Keccak256([]byte(mapSlot), []byte(mapKey))
+	key := crypto.Keccak256([]byte(mapKey), []byte(mapSlot))
 	return c.GetStorageAt(seq, string(key))
 }
 
 func (c *Context) DeleteValueAtMapKey(seq uint64, mapSlot string, mapKey string) {
-	key := crypto.Keccak256([]byte(mapSlot), []byte(mapKey))
+	key := crypto.Keccak256([]byte(mapKey), []byte(mapSlot))
 	c.DeleteStorageAt(seq, string(key))
 }
 
 func (c *Context) GetAndDeleteValueAtMapKey(seq uint64, mapSlot string, mapKey string) []byte {
-	key := crypto.Keccak256([]byte(mapSlot), []byte(mapKey))
+	key := crypto.Keccak256([]byte(mapKey), []byte(mapSlot))
 	res := c.GetStorageAt(seq, string(key))
 	c.DeleteStorageAt(seq, string(key))
 	return res
@@ -138,7 +138,7 @@ func (c *Context) DeleteDynamicArray(seq uint64, arrSlot string) {
 	startSlot := uint256.NewInt(0).SetBytes32(crypto.Keccak256([]byte(arrSlot)))
 	endSlot := uint256.NewInt(0).Add(startSlot, arrLen)
 	for startSlot.Lt(endSlot) {
-		c.DeleteStorageAt(seq,  string(startSlot.Bytes()))
+		c.DeleteStorageAt(seq, string(startSlot.Bytes()))
 		startSlot.AddUint64(startSlot, 1)
 	}
 	c.DeleteStorageAt(seq, arrSlot)
