@@ -90,7 +90,7 @@ evmc_status_code call(ExecutionState& state) noexcept
     state.stack.top() = result.status_code == EVMC_SUCCESS;
 
     if (const auto copy_size = std::min(size_t(output_size), result.output_size); copy_size > 0)
-        std::memcpy(&state.memory[size_t(output_offset)], result.output_data, copy_size);
+        std::memmove(&state.memory[size_t(output_offset)], result.output_data, copy_size);
 
     const auto gas_used = msg.gas - result.gas_left;
     state.gas_left -= gas_used;
