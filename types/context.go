@@ -136,11 +136,11 @@ func (c *Context) GetDynamicArray(seq uint64, arrSlot string) (res [][]byte) {
 
 func (c *Context) CreateDynamicArray(seq uint64, arrSlot string, contents [][]byte) {
 	arrLen := uint256.NewInt(uint64(len(contents)))
-	c.SetStorageAt(seq, arrSlot, arrLen.Bytes())
+	c.SetStorageAt(seq, arrSlot, arrLen.PaddedBytes(32))
 	startSlot := uint256.NewInt(0).SetBytes32(crypto.Keccak256([]byte(arrSlot)))
 	for i, val := range contents {
 		currSlot := uint256.NewInt(0).AddUint64(startSlot, uint64(i))
-		c.SetStorageAt(seq, string(currSlot.Bytes()), val)
+		c.SetStorageAt(seq, string(currSlot.PaddedBytes(32)), val)
 	}
 }
 
