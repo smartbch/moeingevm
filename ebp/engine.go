@@ -491,7 +491,7 @@ func (exec *txEngine) collectCommittableTxs(committableRunnerList []*TxRunner) {
 			TransactionIndex:  int64(idx),
 			Nonce:             runner.Tx.Nonce,
 			BlockHash:         exec.currentBlock.Hash,
-			BlockNumber:       int64(exec.cleanCtx.Height)+1,
+			BlockNumber:       int64(exec.cleanCtx.Height),
 			From:              runner.Tx.From,
 			To:                runner.Tx.To,
 			Value:             runner.Tx.Value,
