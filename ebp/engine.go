@@ -490,8 +490,7 @@ func (exec *txEngine) collectCommittableTxs(committableRunnerList []*TxRunner) {
 			Hash:              runner.Tx.HashID,
 			TransactionIndex:  int64(idx),
 			Nonce:             runner.Tx.Nonce,
-			//BlockHash:         exec.currentBlock.Hash,  // Do not fill it now
-			// we add one to height because modb is updated in the next block
+			BlockHash:         exec.currentBlock.Hash,
 			BlockNumber:       int64(exec.cleanCtx.Height)+1,
 			From:              runner.Tx.From,
 			To:                runner.Tx.To,
@@ -518,8 +517,7 @@ func (exec *txEngine) collectCommittableTxs(committableRunnerList []*TxRunner) {
 			}
 			tx.Logs[i].Data = log.Data
 			log.Data = nil
-			// we add one to height because modb is updated in the next block
-			tx.Logs[i].BlockNumber = uint64(exec.currentBlock.Number)+1
+			tx.Logs[i].BlockNumber = uint64(exec.currentBlock.Number)
 			copy(tx.Logs[i].BlockHash[:], exec.currentBlock.Hash[:])
 			copy(tx.Logs[i].TxHash[:], tx.Hash[:])
 			//txIndex = index in committableRunnerList
@@ -556,14 +554,13 @@ func (exec *txEngine) CommittedTxIds() [][32]byte {
 	return idList
 }
 
-func (exec *txEngine) CommittedTxsForMoDB(blockHash [32]byte) []modbtypes.Tx {
+func (exec *txEngine) CommittedTxsForMoDB() []modbtypes.Tx {
 	txList := make([]modbtypes.Tx, len(exec.committedTxs))
 	for i, tx := range exec.committedTxs {
 		t := modbtypes.Tx{}
 		copy(t.HashId[:], tx.Hash[:])
 		copy(t.SrcAddr[:], tx.From[:])
 		copy(t.DstAddr[:], tx.To[:])
-		tx.BlockHash = blockHash // fill it now using the newest block hash
 		txContent, err := tx.MarshalMsg(nil)
 		if err != nil {
 			panic(err)
