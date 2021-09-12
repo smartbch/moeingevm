@@ -25,7 +25,7 @@ type TxExecutor interface {
 	CollectedTxsCount() int
 	CommittedTxs() []*types.Transaction
 	CommittedTxIds() [][32]byte
-	CommittedTxsForMoDB(blockHash [32]byte) []modbtypes.Tx
+	CommittedTxsForMoDB() []modbtypes.Tx
 	GasUsedInfo() (gasUsed uint64, feeRefund, gasFee uint256.Int)
 	StandbyQLen() int
 }
