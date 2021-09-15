@@ -20,32 +20,28 @@ var (
 )
 
 type Context struct {
-	Height uint64
-	Rbt    *rabbit.RabbitStore
-	Db     modbtypes.DB
+	Rbt *rabbit.RabbitStore
+	Db  modbtypes.DB
 }
 
-func NewContext(height uint64, rbt *rabbit.RabbitStore, db modbtypes.DB) *Context {
+func NewContext(rbt *rabbit.RabbitStore, db modbtypes.DB) *Context {
 	return &Context{
-		Height: height,
-		Rbt:    rbt,
-		Db:     db,
+		Rbt: rbt,
+		Db:  db,
 	}
 }
 
 func (c *Context) WithRbt(rabbitStore *rabbit.RabbitStore) *Context {
 	return &Context{
-		Height: c.Height,
-		Rbt:    rabbitStore,
-		Db:     c.Db,
+		Rbt: rabbitStore,
+		Db:  c.Db,
 	}
 }
 
 func (c *Context) WithDb(db modbtypes.DB) *Context {
 	return &Context{
-		Height: c.Height,
-		Rbt:    c.Rbt,
-		Db:     db,
+		Rbt: c.Rbt,
+		Db:  db,
 	}
 }
 
@@ -57,9 +53,8 @@ func (c *Context) WithRbtCopy() *Context {
 	parent := c.Rbt.GetBaseStore()
 	r := rabbit.NewRabbitStore(parent)
 	return &Context{
-		Height: c.Height,
-		Rbt:    &r,
-		Db:     c.Db,
+		Rbt: &r,
+		Db:  c.Db,
 	}
 }
 

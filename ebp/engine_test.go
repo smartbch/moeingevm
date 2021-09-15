@@ -42,7 +42,7 @@ func prepareTruck() (*store.TrunkStore, *store.RootStore) {
 
 func prepareCtx(t *store.TrunkStore) *types.Context {
 	rbt := rabbit.NewRabbitStore(t)
-	return types.NewContext(0, &rbt, nil)
+	return types.NewContext(&rbt, nil)
 }
 
 var (

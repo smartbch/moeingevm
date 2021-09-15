@@ -97,7 +97,7 @@ func runTestCase(filename string, theCase *tc.TestCase, printLog bool) {
 	var chainId big.Int
 	chainId.SetBytes(currBlock.ChainId[:])
 	txEngine := ebp.NewEbpTxExec(10, 100, 32, 100, &tc.DumbSigner{})
-	ctx := types.NewContext(1, nil, nil)
+	ctx := types.NewContext(nil, nil)
 	rbt = rabbit.NewRabbitStore(trunk)
 	ctx = ctx.WithRbt(&rbt)
 	txEngine.SetContext(ctx)

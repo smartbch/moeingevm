@@ -198,7 +198,7 @@ func (exec *txEngine) parallelReadAccounts(minGasPrice, maxTxGasLimit uint64) (i
 			sender, err := exec.signer.Sender(tx)
 			//set txToRun first
 			txToRun := &types.TxToRun{}
-			txToRun.FromGethTx(tx, sender, exec.cleanCtx.Height)
+			txToRun.FromGethTx(tx, sender, uint64(exec.currentBlock.Number))
 			infoList[myIdx].tx = txToRun
 			if err != nil {
 				infoList[myIdx].errorStr = "invalid signature"
@@ -277,7 +277,7 @@ func (exec *txEngine) recordInvalidTx(info *preparedInfo) {
 		Hash:              info.tx.HashID,
 		TransactionIndex:  int64(len(exec.committedTxs)),
 		Nonce:             info.tx.Nonce,
-		BlockNumber:       int64(exec.cleanCtx.Height),
+		BlockNumber:       exec.currentBlock.Number,
 		From:              info.tx.From,
 		To:                info.tx.To,
 		Value:             info.tx.Value,
@@ -491,7 +491,7 @@ func (exec *txEngine) collectCommittableTxs(committableRunnerList []*TxRunner) {
 			TransactionIndex:  int64(idx),
 			Nonce:             runner.Tx.Nonce,
 			BlockHash:         exec.currentBlock.Hash,
-			BlockNumber:       int64(exec.cleanCtx.Height),
+			BlockNumber:       exec.currentBlock.Number,
 			From:              runner.Tx.From,
 			To:                runner.Tx.To,
 			Value:             runner.Tx.Value,
