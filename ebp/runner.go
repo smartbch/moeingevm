@@ -244,6 +244,7 @@ func (runner *TxRunner) changeValue(chg_value *changed_value) {
 //hash => height; height => block in db
 func (runner *TxRunner) getBlockHash(num C.uint64_t) (result evmc_bytes32) {
 	hash := runner.Ctx.GetBlockHashByHeight(uint64(num))
+	fmt.Printf("hash:%v, num:%d in getBlockHash runner\n", hash, uint64(num))
 	writeCBytes32WithSlice(&result, hash[:])
 	return
 }
@@ -436,6 +437,7 @@ func runTxHelper(idx int, currBlock *types.BlockInfo, estimateGas bool) int64 {
 	var bi block_info
 	writeCBytes20WithArray(&bi.coinbase, currBlock.Coinbase)
 	bi.number = C.int64_t(currBlock.Number)
+	fmt.Printf("currBlock.Number:%d, bi.number:%d\n", currBlock.Number, int64(bi.number))
 	bi.timestamp = C.int64_t(currBlock.Timestamp)
 	bi.gas_limit = C.int64_t(currBlock.GasLimit)
 	writeCBytes32WithSlice(&bi.difficulty, currBlock.Difficulty[:])
