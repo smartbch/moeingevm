@@ -171,6 +171,13 @@ func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice, maxTxGasLimit uint
 	return addr2idx
 }
 
+func (exec *txEngine) getCurrHeight() uint64 {
+	if exec.currentBlock != nil {
+		return uint64(exec.currentBlock.Number)
+	}
+	return 0
+}
+
 // Read accounts' information in parallel, while checking accouts' existence and signatures' validity
 func (exec *txEngine) parallelReadAccounts(minGasPrice, maxTxGasLimit uint64) (infoList []*preparedInfo, ctxAA []*ctxAndAccounts) {
 	//for each tx, we fetch some info for it
@@ -198,7 +205,7 @@ func (exec *txEngine) parallelReadAccounts(minGasPrice, maxTxGasLimit uint64) (i
 			sender, err := exec.signer.Sender(tx)
 			//set txToRun first
 			txToRun := &types.TxToRun{}
-			txToRun.FromGethTx(tx, sender, uint64(exec.currentBlock.Number))
+			txToRun.FromGethTx(tx, sender, exec.getCurrHeight())
 			infoList[myIdx].tx = txToRun
 			if err != nil {
 				infoList[myIdx].errorStr = "invalid signature"
@@ -277,7 +284,7 @@ func (exec *txEngine) recordInvalidTx(info *preparedInfo) {
 		Hash:              info.tx.HashID,
 		TransactionIndex:  int64(len(exec.committedTxs)),
 		Nonce:             info.tx.Nonce,
-		BlockNumber:       exec.currentBlock.Number,
+		BlockNumber:       int64(exec.getCurrHeight()),
 		From:              info.tx.From,
 		To:                info.tx.To,
 		Value:             info.tx.Value,
