@@ -150,6 +150,10 @@ func (c *Context) GetTxByHash(txHash common.Hash) (tx *Transaction, err error) {
 	return
 }
 
+func (c *Context) GetTxSigByHash(txHash common.Hash) [65]byte {
+	return c.Db.GetTxSigByHash(txHash)
+}
+
 func (c *Context) GetBlockHashByHeight(height uint64) [32]byte {
 	return c.Db.GetBlockHashByHeight(int64(height))
 }
