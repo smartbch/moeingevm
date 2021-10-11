@@ -15,7 +15,7 @@ require (
 	github.com/seehuhn/mt19937 v1.0.0
 	github.com/shirou/gopsutil v3.21.3+incompatible // indirect
 	github.com/smartbch/moeingads v0.3.0
-	github.com/smartbch/moeingdb v0.3.3-0.20210911235855-2eb460b7bb07
+	github.com/smartbch/moeingdb v0.3.3-0.20211011030534-a7d47d4444af
 	github.com/stretchr/testify v1.7.0
 	github.com/tendermint/tendermint v0.34.10
 	github.com/tinylib/msgp v1.1.5

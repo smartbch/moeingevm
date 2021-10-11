@@ -116,8 +116,8 @@ func (c *Context) SetCurrBlockBasicInfo(blk *Block) {
 	c.Rbt.Set([]byte{CURR_BLOCK_KEY}, blk.SerializeBasicInfo())
 }
 
-func (c *Context) StoreBlock(blk *modbtypes.Block) {
-	c.Db.AddBlock(blk, -1)
+func (c *Context) StoreBlock(blk *modbtypes.Block, txid2sigMap map[[32]byte][65]byte) {
+	c.Db.AddBlock(blk, -1, txid2sigMap)
 }
 
 func (c *Context) GetLatestHeight() int64 {
