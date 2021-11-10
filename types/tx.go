@@ -10,6 +10,63 @@ const (
 	ReceiptStatusSuccessful = uint64(1)
 )
 
+type InternalTxCall struct {
+	/** The kind of the call. For zero-depth calls ::EVMC_CALL SHOULD be used. */
+	Kind int `msgp:"kind"`
+
+	/**
+	* Additional flags modifying the call execution behavior.
+	* In the current version the only valid values are ::EVMC_STATIC or 0.
+	 */
+	Flags uint32 `msgp:"flags"`
+
+	/** The call depth. */
+	Depth int32 `msgp:"depth"`
+
+	/** The amount of gas for message execution. */
+	Gas int64
+
+	/** The callee of the transaction. */
+	Destination [20]byte `msgp:"destination"`
+
+	/** The caller of the transaction. */
+	Sender [20]byte `msgp:"sender"`
+
+	/** the input data.  */
+	Input []byte `msgp:"input"`
+
+	/**
+	* The amount of BCH transferred with the message.
+	 */
+	Value [32]byte `msgp:"value"`
+}
+
+type InternalTxReturn struct {
+	/** The execution status code. */
+	StatusCode int `msgp:"statusCode"`
+
+	/**
+	* The amount of gas left after the execution.
+	* If StatusCode is neither ::EVMC_SUCCESS nor ::EVMC_REVERT
+	* the value MUST be 0.
+	 */
+	GasLeft int64 `msgp:"gasLeft"`
+
+	/**  the output data.  */
+	Output []byte `msgp:"output"`
+
+	/**
+	* The address of the contract created by create instructions.
+	*
+	* This field has valid value only if:
+	* - it is a result of the Host method evmc_host_interface::call
+	* - and the result describes successful contract creation
+	*   (StatusCode is ::EVMC_SUCCESS).
+	* In all other cases the address MUST be null bytes.
+	 */
+	CreateAddress [20]byte `msgp:"createAddress"`
+}
+
 type Log struct {
 	// Consensus fields:
 	// address of the contract that generated the event
@@ -70,6 +127,9 @@ type Transaction struct {
 	StatusStr         string    `msg:"statusstr"`    //tx execute result explained
 	OutData           []byte    `msg:"outdata"`      //the output data from the transaction
 	//PostState  []byte  //look at Receipt.PostState
+
+	InternalTxCalls   []InternalTxCall   `msg:"internalTxCalls"`
+	InternalTxReturns []InternalTxReturn `msg:"internalTxReturns"`
 }
 
 //TRANSACTION RECEIPT - A transaction receipt object, or null when no receipt was found:

@@ -504,6 +504,8 @@ func (exec *txEngine) collectCommittableTxs(committableRunnerList []*TxRunner) {
 			OutData:           append([]byte{}, runner.OutData...),
 			Status:            gethtypes.ReceiptStatusSuccessful,
 			StatusStr:         StatusToStr(runner.Status),
+			InternalTxCalls:   runner.InternalTxCalls,
+			InternalTxReturns: runner.InternalTxReturns,
 		}
 		if StatusIsFailure(runner.Status) {
 			tx.Status = gethtypes.ReceiptStatusFailed
