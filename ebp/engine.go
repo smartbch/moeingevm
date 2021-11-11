@@ -87,7 +87,7 @@ func (nm *nonceMatcherWithCtxAA) MatchLatestNonce(addr common.Address, nonce uin
 	return ok
 }
 
-func GetEmptyNonceRecorder() NonceMatcher {
+func GetEmptyNonceMatcher() NonceMatcher {
 	return (*nonceMatcherWithCtxAA)(nil)
 }
 
@@ -113,7 +113,7 @@ func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice, maxTxGasLimit uint
 	exec.cleanCtx.Rbt.GetBaseStore().PrepareForUpdate(types.StandbyTxQueueKey[:])
 	if len(exec.txList) == 0 {
 		exec.cleanCtx.Close(false)
-		return GetEmptyNonceRecorder()
+		return GetEmptyNonceMatcher()
 	}
 	infoList, ctxAA := exec.parallelReadAccounts(minGasPrice, maxTxGasLimit)
 	addr2idx := make(map[common.Address]int, len(exec.txList)) // map address to ctxAA's index
