@@ -70,6 +70,27 @@ type ctxAndAccounts struct {
 	addr2nonce  map[common.Address]uint64 //caches the latest nonce of accounts and won't write back to states
 }
 
+type nonceMatcherWithCtxAA struct {
+	ctxAA    []*ctxAndAccounts
+	addr2idx map[common.Address]int
+}
+
+func (nm *nonceMatcherWithCtxAA) MatchLatestNonce(addr common.Address, nonce uint64) bool {
+	if nm==nil  {
+		return false
+	}
+	idx, ok := nm.addr2idx[addr]
+	if !ok {
+		return false
+	}
+	_, ok = nm.ctxAA[idx].addr2nonce[addr]
+	return ok
+}
+
+func GetEmptyNonceRecorder() NonceMatcher {
+	return (*nonceMatcherWithCtxAA)(nil)
+}
+
 func NewEbpTxExec(exeRoundCount, runnerNumber, parallelNum, defaultTxListCap int, s gethtypes.Signer) *txEngine {
 	Runners = make([]*TxRunner, runnerNumber)
 	return &txEngine{
@@ -88,11 +109,11 @@ func (exec *txEngine) SetContext(ctx *types.Context) {
 }
 
 // Check transactions' signatures and insert the valid ones into standby queue
-func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice, maxTxGasLimit uint64) (touchedAddrs map[common.Address]int) {
+func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice, maxTxGasLimit uint64) NonceMatcher {
 	exec.cleanCtx.Rbt.GetBaseStore().PrepareForUpdate(types.StandbyTxQueueKey[:])
 	if len(exec.txList) == 0 {
 		exec.cleanCtx.Close(false)
-		return
+		return GetEmptyNonceRecorder()
 	}
 	infoList, ctxAA := exec.parallelReadAccounts(minGasPrice, maxTxGasLimit)
 	addr2idx := make(map[common.Address]int, len(exec.txList)) // map address to ctxAA's index
@@ -168,7 +189,7 @@ func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice, maxTxGasLimit uint
 	exec.txList = exec.txList[:0] // clear txList after consumption
 	//write ctx state to trunk
 	exec.cleanCtx.Close(false)
-	return addr2idx
+	return &nonceMatcherWithCtxAA{ctxAA: ctxAA, addr2idx:addr2idx}
 }
 
 func (exec *txEngine) getCurrHeight() uint64 {
