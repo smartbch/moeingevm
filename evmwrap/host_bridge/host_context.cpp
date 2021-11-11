@@ -308,6 +308,7 @@ void evmc_host_context::load_code(const evmc_address& addr) {
 
 evmc_result evmc_host_context::call(const evmc_message& call_msg) {
 	txctrl->gas_trace_append(call_msg.gas|MSB64);
+	txctrl->add_internal_tx_call(call_msg);
 	evmc_host_context ctx(txctrl, call_msg, this->smallbuf, this->revision);
 	evmc_result result;
 	bool normal_run = false;
@@ -346,6 +347,7 @@ evmc_result evmc_host_context::call(const evmc_message& call_msg) {
 		}
 	}
 	txctrl->gas_trace_append(result.gas_left);
+	txctrl->add_internal_tx_return(result);
 	return result;
 }
 

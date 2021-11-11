@@ -333,7 +333,11 @@ void cached_state::collect_result(bridge_collect_result_fn collect_result_fn,
 		.value_num = changed_values.size(),
 		.logs = added_logs.data(),
 		.log_num = added_logs.size(),
-		.refund = refund
+		.refund = refund,
+		.internal_tx_calls = internal_tx_calls.data(),
+		.internal_tx_call_num = internal_tx_calls.size(),
+		.internal_tx_returns = internal_tx_returns.data(),
+		.internal_tx_return_num = internal_tx_returns.size()
 	};
 	//std::cerr<<"Here in collect_result "<<size_t(&changes)<<std::endl;
 	// use the following callback function to pass changes to Go environment

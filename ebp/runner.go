@@ -23,6 +23,7 @@ import "C"
 type (
 	evmc_address             = C.struct_evmc_address
 	evmc_bytes32             = C.struct_evmc_bytes32
+	evmc_message             = C.struct_evmc_message
 	evmc_result              = C.struct_evmc_result
 	changed_account          = C.struct_changed_account
 	changed_creation_counter = C.struct_changed_creation_counter
@@ -111,6 +112,9 @@ type TxRunner struct {
 	ForRpc    bool
 
 	CreatedContractAddress common.Address
+
+	InternalTxCalls   []types.InternalTxCall
+	InternalTxReturns []types.InternalTxReturn
 }
 
 func NewTxRunner(ctx *types.Context, tx *types.TxToRun) *TxRunner {
@@ -305,6 +309,26 @@ func convertLog(log *added_log) (res types.EvmLog) {
 	return
 }
 
+func convertTxCalls(msg *evmc_message) (txCall types.InternalTxCall) {
+	txCall.Kind = int(msg.kind)
+	txCall.Flags = uint32(msg.flags)
+	txCall.Depth = int32(msg.depth)
+	txCall.Gas = int64(msg.gas)
+	txCall.Destination = toAddress(&msg.destination)
+	txCall.Sender = toAddress(&msg.sender)
+	txCall.Input = C.GoBytes(unsafe.Pointer(msg.input_data), C.int(msg.input_size))
+	txCall.Value = toHash(&msg.value)
+	return
+}
+
+func convertTxReturns(ret *evmc_result) (txReturn types.InternalTxReturn) {
+	txReturn.StatusCode = int(ret.status_code)
+	txReturn.GasLeft = int64(ret.gas_left)
+	txReturn.Output = C.GoBytes(unsafe.Pointer(ret.output_data), C.int(ret.output_size))
+	txReturn.CreateAddress = toAddress(&ret.create_address)
+	return
+}
+
 // This function will be called by the C environment to feed changes to Go environment, before the
 // C environment cleans up and exits.
 func (runner *TxRunner) collectResult(result *all_changed, ret_value *evmc_result) {
@@ -347,6 +371,20 @@ func (runner *TxRunner) collectResult(result *all_changed, ret_value *evmc_resul
 		logs := (*[1 << 30]added_log)(unsafe.Pointer(result.logs))[:size:size]
 		for _, elem := range logs {
 			runner.Logs = append(runner.Logs, convertLog(&elem))
+		}
+	}
+	size = int(result.internal_tx_call_num)
+	if size != 0 {
+		calls := (*[1 << 30]evmc_message)(unsafe.Pointer(result.internal_tx_calls))[:size:size]
+		for _, elem := range calls {
+			runner.InternalTxCalls = append(runner.InternalTxCalls, convertTxCalls(&elem))
+		}
+	}
+	size = int(result.internal_tx_return_num)
+	if size != 0 {
+		returns := (*[1 << 30]evmc_result)(unsafe.Pointer(result.internal_tx_returns))[:size:size]
+		for _, elem := range returns {
+			runner.InternalTxReturns = append(runner.InternalTxReturns, convertTxReturns(&elem))
 		}
 	}
 	runner.Status = int(ret_value.status_code)

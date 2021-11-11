@@ -189,6 +189,9 @@ class cached_state {
 	world_state_reader* world;
 	std::vector<evm_log> logs;
 	friend struct journal_entry;
+	std::vector<evmc_message> internal_tx_calls;
+	std::vector<evmc_result> internal_tx_returns;
+	std::vector<bytes> data_container;
 protected:
 	//the following protected functions are used by the journal_entry to undo modification
 	void _delete_account(const evmc_address& addr) {
@@ -245,6 +248,18 @@ public:
 	void collect_result(bridge_collect_result_fn collect_result_fn,
 			int collector_handler,
 			const evmc_result* ret_value);
+	void add_internal_tx_call(const evmc_message& msg) {
+		internal_tx_calls.push_back(msg);
+		// make a copy of data and make the pointer point to this copy
+		data_container.emplace_back(msg.input_data, msg.input_size);
+		internal_tx_calls.back().input_data = data_container.back().data();
+	}
+	void add_internal_tx_return(const evmc_result& res) {
+		internal_tx_returns.push_back(res);
+		// make a copy of data and make the pointer point to this copy
+		data_container.emplace_back(res.output_data, res.output_size);
+		internal_tx_returns.back().output_data = data_container.back().data();
+	}
 };
 
 // =============================================================
@@ -427,11 +442,18 @@ public:
 	void sub_refund(uint64_t delta);
 
 	// just forward the function call to underlying cstate
+	void add_internal_tx_call(const evmc_message& msg) {
+		cstate.add_internal_tx_call(msg);
+	}
+	void add_internal_tx_return(const evmc_result& res) {
+		cstate.add_internal_tx_return(res);
+	}
 	void collect_result(bridge_collect_result_fn collect_result_fn,
 	                    int collector_handler,
 	                    const evmc_result* ret_value) {
 		cstate.collect_result(collect_result_fn, collector_handler, ret_value);
 	}
+
 	int64_t estimate_gas(int64_t init_guess);
 
 };

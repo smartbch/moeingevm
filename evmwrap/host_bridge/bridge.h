@@ -79,6 +79,10 @@ struct all_changed {
 	struct added_log* logs;
 	size_t log_num;
 	uint64_t refund;
+	struct evmc_message* internal_tx_calls;
+	size_t internal_tx_call_num;
+	struct evmc_result* internal_tx_returns;
+	size_t internal_tx_return_num;
 };
 
 
