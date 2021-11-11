@@ -13,7 +13,7 @@ require (
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/seehuhn/mt19937 v1.0.0
 	github.com/smartbch/moeingads v0.3.0
-	github.com/smartbch/moeingdb v0.3.0
+	github.com/smartbch/moeingdb v0.3.3
 	github.com/stretchr/testify v1.7.0
 	github.com/tendermint/tendermint v0.34.10
 	github.com/tinylib/msgp v1.1.5
@@ -30,6 +30,8 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dterei/gotsc v0.0.0-20160722215413-e78f872945c6 // indirect
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
+	github.com/go-kit/kit v0.10.0 // indirect
+	github.com/go-logfmt/logfmt v0.5.0 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/golang/snappy v0.0.3 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect

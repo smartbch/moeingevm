@@ -5,6 +5,8 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/tendermint/tendermint/libs/log"
+
 	"github.com/smartbch/moeingdb/modb"
 	"github.com/smartbch/moeingevm/types"
 )
@@ -22,7 +24,7 @@ func GetBlockContentByHeight(c *types.Context, height uint64) (*types.Block, []*
 }
 
 func main() {
-	ctx := &types.Context{Db: modb.NewMoDB(os.Args[1])}
+	ctx := &types.Context{Db: modb.NewMoDB(os.Args[1], log.NewNopLogger())}
 	height, err := strconv.Atoi(os.Args[2])
 	if err != nil {
 		panic(err)

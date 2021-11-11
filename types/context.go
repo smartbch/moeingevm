@@ -178,8 +178,8 @@ func (c *Context) SetCurrBlockBasicInfo(blk *Block) {
 	c.Rbt.Set([]byte{CURR_BLOCK_KEY}, blk.SerializeBasicInfo())
 }
 
-func (c *Context) StoreBlock(blk *modbtypes.Block) {
-	c.Db.AddBlock(blk, -1)
+func (c *Context) StoreBlock(blk *modbtypes.Block, txid2sigMap map[[32]byte][65]byte) {
+	c.Db.AddBlock(blk, -1, txid2sigMap)
 }
 
 func (c *Context) GetLatestHeight() int64 {
@@ -210,6 +210,10 @@ func (c *Context) GetTxByHash(txHash common.Hash) (tx *Transaction, err error) {
 		err = ErrTxNotFound
 	}
 	return
+}
+
+func (c *Context) GetTxSigByHash(txHash common.Hash) [65]byte {
+	return c.Db.GetTxSigByHash(txHash)
 }
 
 func (c *Context) GetBlockHashByHeight(height uint64) [32]byte {
