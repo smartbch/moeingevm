@@ -20,29 +20,58 @@ var (
 )
 
 type Context struct {
-	Rbt *rabbit.RabbitStore
-	Db  modbtypes.DB
+	Rbt              *rabbit.RabbitStore
+	Db               modbtypes.DB
+	Height           int64
+	XHedgeForkBlock  int64
+	ShaGateForkBlock int64
 }
 
 func NewContext(rbt *rabbit.RabbitStore, db modbtypes.DB) *Context {
 	return &Context{
-		Rbt: rbt,
-		Db:  db,
+		Rbt:              rbt,
+		Db:               db,
+		XHedgeForkBlock:  math.MaxInt64,
+		ShaGateForkBlock: math.MaxInt64,
 	}
 }
 
 func (c *Context) WithRbt(rabbitStore *rabbit.RabbitStore) *Context {
 	return &Context{
-		Rbt: rabbitStore,
-		Db:  c.Db,
+		Rbt:              rabbitStore,
+		Db:               c.Db,
+		XHedgeForkBlock:  c.XHedgeForkBlock,
+		ShaGateForkBlock: c.ShaGateForkBlock,
 	}
 }
 
 func (c *Context) WithDb(db modbtypes.DB) *Context {
 	return &Context{
-		Rbt: c.Rbt,
-		Db:  db,
+		Rbt:              c.Rbt,
+		Db:               db,
+		XHedgeForkBlock:  c.XHedgeForkBlock,
+		ShaGateForkBlock: c.ShaGateForkBlock,
 	}
+}
+
+func (c *Context) SetXHedgeForkBlock(xHedgeForkBlock int64) {
+	c.XHedgeForkBlock = xHedgeForkBlock
+}
+
+func (c *Context) SetShaGateForkBlock(shaGateForkBlock int64) {
+	c.ShaGateForkBlock = shaGateForkBlock
+}
+
+func (c *Context) SetCurrentHeight(height int64) {
+	c.Height = height
+}
+
+func (c *Context) IsXHedgeFork() bool {
+	return c.Height >= c.XHedgeForkBlock
+}
+
+func (c *Context) IsShaGateFork() bool {
+	return c.Height >= c.ShaGateForkBlock
 }
 
 //new empty rbt with same parent store as the old one
