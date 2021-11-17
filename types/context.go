@@ -42,6 +42,7 @@ func (c *Context) WithRbt(rabbitStore *rabbit.RabbitStore) *Context {
 		Db:               c.Db,
 		XHedgeForkBlock:  c.XHedgeForkBlock,
 		ShaGateForkBlock: c.ShaGateForkBlock,
+		Height:           c.Height,
 	}
 }
 
@@ -51,6 +52,7 @@ func (c *Context) WithDb(db modbtypes.DB) *Context {
 		Db:               db,
 		XHedgeForkBlock:  c.XHedgeForkBlock,
 		ShaGateForkBlock: c.ShaGateForkBlock,
+		Height:           c.Height,
 	}
 }
 
@@ -82,8 +84,11 @@ func (c *Context) WithRbtCopy() *Context {
 	parent := c.Rbt.GetBaseStore()
 	r := rabbit.NewRabbitStore(parent)
 	return &Context{
-		Rbt: &r,
-		Db:  c.Db,
+		Rbt:              &r,
+		Db:               c.Db,
+		ShaGateForkBlock: c.ShaGateForkBlock,
+		XHedgeForkBlock:  c.XHedgeForkBlock,
+		Height:           c.Height,
 	}
 }
 
