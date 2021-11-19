@@ -75,16 +75,16 @@ type nonceMatcherWithCtxAA struct {
 	addr2idx map[common.Address]int
 }
 
-func (nm *nonceMatcherWithCtxAA) MatchLatestNonce(addr common.Address, nonce uint64) bool {
+func (nm *nonceMatcherWithCtxAA) MatchLatestNonce(addr common.Address, nonce uint64) (matched bool, dbNonce uint64) {
 	if nm==nil  {
-		return false
+		return false, 0
 	}
 	idx, ok := nm.addr2idx[addr]
 	if !ok {
-		return false
+		return false, 0
 	}
-	_, ok = nm.ctxAA[idx].addr2nonce[addr]
-	return ok
+	dbNonce, ok = nm.ctxAA[idx].addr2nonce[addr]
+	return ok, dbNonce
 }
 
 func GetEmptyNonceMatcher() NonceMatcher {

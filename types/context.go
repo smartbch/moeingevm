@@ -13,10 +13,11 @@ import (
 )
 
 var (
-	ErrAccountNotExist = errors.New("account does not exist")
-	ErrNonceTooSmall   = errors.New("tx nonce is smaller than the account nonce")
-	ErrNonceTooLarge   = errors.New("tx nonce is larger than the account nonce")
-	ErrTooManyEntries  = errors.New("too many candidicate entries to be returned, please limit the difference between startHeight and endHeight")
+	ErrAccountNotExist        = errors.New("account does not exist")
+	ErrNonceTooSmall          = errors.New("tx nonce is smaller than the account nonce")
+	ErrSameNonceAlredyInBlock = errors.New("tx with same nonce already in block")
+	ErrNonceTooLarge          = errors.New("tx nonce is larger than the account nonce")
+	ErrTooManyEntries         = errors.New("too many candidicate entries to be returned, please limit the difference between startHeight and endHeight")
 )
 
 type Context struct {
@@ -305,8 +306,8 @@ func (c *Context) CheckNonce(sender common.Address, nonce uint64) (*AccountInfo,
 	return acc, nil
 }
 
-func (c *Context) DeductTxFee(sender common.Address, acc *AccountInfo, txGas uint64, gasPrice *uint256.Int) error {
-	acc.UpdateNonce(acc.Nonce() + 1)
+func (c *Context) DeductTxFeeWithSpecificNonce(sender common.Address, acc *AccountInfo, txGas uint64, gasPrice *uint256.Int, newNonce uint64) error {
+	acc.UpdateNonce(newNonce)
 	var gasFee, gas uint256.Int
 	gas.SetUint64(txGas)
 	gasFee.Mul(&gas, gasPrice)

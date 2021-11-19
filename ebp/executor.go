@@ -31,5 +31,5 @@ type TxExecutor interface {
 }
 
 type NonceMatcher interface {
-	MatchLatestNonce(addr common.Address, nonce uint64) bool
+	MatchLatestNonce(addr common.Address, nonce uint64) (matched bool, dbNonce uint64)
 }
