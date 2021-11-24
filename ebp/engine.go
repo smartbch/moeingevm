@@ -199,7 +199,7 @@ func (exec *txEngine) getCurrHeight() uint64 {
 	return 0
 }
 
-// Read accounts' information in parallel, while checking accouts' existence and signatures' validity
+// Read accounts' information in parallel, while checking accounts' existence and signatures' validity
 func (exec *txEngine) parallelReadAccounts(minGasPrice, maxTxGasLimit uint64) (infoList []*preparedInfo, ctxAA []*ctxAndAccounts) {
 	//for each tx, we fetch some info for it
 	infoList = make([]*preparedInfo, len(exec.txList))
