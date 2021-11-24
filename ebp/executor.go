@@ -31,5 +31,8 @@ type TxExecutor interface {
 }
 
 type NonceMatcher interface {
-	MatchLatestNonce(addr common.Address, nonce uint64) (matched bool, dbNonce uint64)
+	GetLatestNonce(addr common.Address) (nonce uint64, exist bool)
+	SetLatestNonce(addr common.Address, newNonce uint64)
+	GetLatestBalance(addr common.Address) (balance *uint256.Int, exist bool)
+	SetLatestBalance(addr common.Address, balance *uint256.Int)
 }
