@@ -358,6 +358,11 @@ public:
 			gas_trace.reserve(100);
 		}
 	}
+
+	int64_t get_block_number() {
+		return tx_context.block_number;
+	}
+
 	void gas_trace_append(int64_t gas) {
 		if(need_gas_estimation) gas_trace.push_back(gas);
 	}

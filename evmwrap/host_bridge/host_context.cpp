@@ -976,7 +976,11 @@ evmc_result evmc_host_context::sep206_transferFrom() {
 	memcpy(amount_be.bytes, msg.input_data + 4 + 32 + 32, 32);
 	uint256 amount = u256be_to_u256(amount_be);
 	evmc_uint256be balance_be = get_balance(source);
-	if(u256be_to_u256(balance_be) < amount) {
+	uint256 margin = static_cast<uint256>(0);
+	if(txctrl->get_block_number() >= HARD_FORK_HEIGH_1) { //set margin=0.001BCH (10**15)
+		margin = static_cast<uint256>(1000ULL*1000ULL*1000ULL*1000ULL*1000ULL);
+	}
+	if(u256be_to_u256(balance_be) < amount+margin) {
 		return evmc_result{.status_code=EVMC_INSUFFICIENT_BALANCE};
 	}
 	uint8_t owner_and_spender[64]; 
