@@ -13,7 +13,7 @@ type TxExecutor interface {
 	//step 1: for deliverTx, collect block txs in engine.txList
 	CollectTx(tx *gethtypes.Transaction)
 	//step 2: for commit, check sig, insert regular txs standbyTxQ
-	Prepare(reorderSeed int64, minGasPrice, maxTxGasLimit uint64) NonceMatcher
+	Prepare(reorderSeed int64, minGasPrice, maxTxGasLimit uint64) Frontier
 	//step 3: for postCommit, parallel execute tx in standbyTxQ
 	Execute(currBlock *types.BlockInfo)
 
@@ -30,9 +30,11 @@ type TxExecutor interface {
 	StandbyQLen() int
 }
 
-type NonceMatcher interface {
+type Frontier interface {
 	GetLatestNonce(addr common.Address) (nonce uint64, exist bool)
 	SetLatestNonce(addr common.Address, newNonce uint64)
 	GetLatestBalance(addr common.Address) (balance *uint256.Int, exist bool)
 	SetLatestBalance(addr common.Address, balance *uint256.Int)
+	GetLatestTotalGasLimit(addr common.Address) (gasLimit uint64, exist bool)
+	SetLatestTotalGasLimit(addr common.Address, gasLimit uint64)
 }

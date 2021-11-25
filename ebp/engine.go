@@ -22,6 +22,7 @@ import (
 
 const DefaultTxGasLimit uint64 = 1000_0000
 
+var Sep206Address = common.HexToAddress("0x0000000000000000000000000000000000002711")
 var _ TxExecutor = (*txEngine)(nil)
 
 type TxRange struct {
@@ -74,13 +75,18 @@ type ctxAndAccounts struct {
 	addr2Balance map[common.Address]*uint256.Int //caches latest balance
 }
 
-type nonceMatcher struct {
+type frontier struct {
 	addr2nonce   map[common.Address]uint64
 	addr2Balance map[common.Address]*uint256.Int //caches latest balance
+	addr2GasLimit map[common.Address]uint64 //cache total txGasLimit during one block
 }
 
-func NewNonceMatcherWithCtxAA(ctxAA []*ctxAndAccounts, addr2idx map[common.Address]int) *nonceMatcher {
-	nm := nonceMatcher{addr2nonce: make(map[common.Address]uint64), addr2Balance: make(map[common.Address]*uint256.Int)}
+func NewFrontierWithCtxAA(ctxAA []*ctxAndAccounts, addr2idx map[common.Address]int) *frontier {
+	nm := frontier{
+		addr2nonce: make(map[common.Address]uint64),
+		addr2Balance: make(map[common.Address]*uint256.Int),
+		addr2GasLimit: make(map[common.Address]uint64),
+	}
 	for addr, idx := range addr2idx {
 		if nonce, ok := ctxAA[idx].addr2nonce[addr]; ok {
 			nm.addr2nonce[addr] = nonce
@@ -94,7 +100,7 @@ func NewNonceMatcherWithCtxAA(ctxAA []*ctxAndAccounts, addr2idx map[common.Addre
 	return &nm
 }
 
-func (nm *nonceMatcher) GetLatestNonce(addr common.Address) (nonce uint64, exist bool) {
+func (nm *frontier) GetLatestNonce(addr common.Address) (nonce uint64, exist bool) {
 	if nm == nil {
 		return 0, false
 	}
@@ -102,14 +108,14 @@ func (nm *nonceMatcher) GetLatestNonce(addr common.Address) (nonce uint64, exist
 	return nonce, exist
 }
 
-func (nm *nonceMatcher) SetLatestNonce(addr common.Address, newNonce uint64) {
+func (nm *frontier) SetLatestNonce(addr common.Address, newNonce uint64) {
 	if nm == nil {
 		return
 	}
 	nm.addr2nonce[addr] = newNonce
 }
 
-func (nm *nonceMatcher) GetLatestBalance(addr common.Address) (balance *uint256.Int, exist bool) {
+func (nm *frontier) GetLatestBalance(addr common.Address) (balance *uint256.Int, exist bool) {
 	if nm == nil {
 		return nil, false
 	}
@@ -117,15 +123,34 @@ func (nm *nonceMatcher) GetLatestBalance(addr common.Address) (balance *uint256.
 	return balance, exist
 }
 
-func (nm *nonceMatcher) SetLatestBalance(addr common.Address, balance *uint256.Int) {
+func (nm *frontier) SetLatestBalance(addr common.Address, balance *uint256.Int) {
 	if nm == nil {
 		return
 	}
 	nm.addr2Balance[addr] = balance
 }
 
-func GetEmptyNonceMatcher() NonceMatcher {
-	return &nonceMatcher{addr2nonce: make(map[common.Address]uint64), addr2Balance: make(map[common.Address]*uint256.Int)}
+func (nm *frontier) GetLatestTotalGasLimit(addr common.Address) (gasLimit uint64, exist bool) {
+	if nm == nil {
+		return 0, false
+	}
+	gasLimit, exist = nm.addr2GasLimit[addr]
+	return gasLimit, exist
+}
+
+func (nm *frontier) SetLatestTotalGasLimit(addr common.Address, gasLimit uint64) {
+	if nm == nil {
+		return
+	}
+	nm.addr2GasLimit[addr] = gasLimit
+}
+
+func GetEmptyFrontier() Frontier {
+	return &frontier{
+		addr2nonce: make(map[common.Address]uint64),
+		addr2Balance: make(map[common.Address]*uint256.Int),
+		addr2GasLimit: make(map[common.Address]uint64),
+	}
 }
 
 func NewEbpTxExec(exeRoundCount, runnerNumber, parallelNum, defaultTxListCap int, s gethtypes.Signer, logger log.Logger) *txEngine {
@@ -147,11 +172,11 @@ func (exec *txEngine) SetContext(ctx *types.Context) {
 }
 
 // Check transactions' signatures and insert the valid ones into standby queue
-func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice, maxTxGasLimit uint64) NonceMatcher {
+func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice, maxTxGasLimit uint64) Frontier {
 	exec.cleanCtx.Rbt.GetBaseStore().PrepareForUpdate(types.StandbyTxQueueKey[:])
 	if len(exec.txList) == 0 {
 		exec.cleanCtx.Close(false)
-		return GetEmptyNonceMatcher()
+		return GetEmptyFrontier()
 	}
 	infoList, ctxAA := exec.parallelReadAccounts(minGasPrice, maxTxGasLimit)
 	addr2idx := make(map[common.Address]int, len(exec.txList)) // map address to ctxAA's index
@@ -197,35 +222,8 @@ func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice, maxTxGasLimit uint
 					continue
 				}
 				entry.addr2nonce[sender]++
-				gasFee := uint256.NewInt(0).SetUint64(info.tx.Gas)
-				gasFee.Mul(gasFee, utils.U256FromSlice32(info.tx.GasPrice[:]))
-				err := SubSenderAccBalance(entry.ctx, sender, gasFee)
-				if err != nil {
-					exec.logger.Debug("prepare::deduct gas fee failed", "txHash", info.tx.HashID.String())
-					//clear balance cache to prevent subsequent tx gas fee not collect always
-					entry.addr2Balance[sender] = uint256.NewInt(0)
-					info.errorStr = "not enough balance to pay gasfee"
+				if exec.deductGasFeeAndUpdateFrontier(sender, info, entry) != nil {
 					continue
-				} else {
-					//todo: support sep206 transfer later
-					//update balance cache for continuous tx check in CheckTx
-					if balance, exist := entry.addr2Balance[sender]; !exist {
-						entry.addr2Balance[sender] = GetBalanceAfterBchTransfer(entry.ctx, sender, info.tx.Value)
-					} else {
-						if balance.Cmp(gasFee) < 0 {
-							entry.addr2Balance[sender] = uint256.NewInt(0)
-						} else {
-							balance.Sub(balance, gasFee)
-							txValue, _ := uint256.FromBig(utils.BigIntFromSlice32(info.tx.Value[:]))
-							if balance.Cmp(txValue) < 0 {
-								entry.addr2Balance[sender] = uint256.NewInt(0)
-							} else {
-								balance.Sub(balance, txValue)
-								entry.addr2Balance[sender] = balance
-							}
-						}
-					}
-					entry.totalGasFee.Add(entry.totalGasFee, gasFee)
 				}
 				entry.changed = true //now this context needs writeback
 				info.txBytes = info.tx.ToBytes()
@@ -249,7 +247,42 @@ func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice, maxTxGasLimit uint
 	exec.txList = exec.txList[:0] // clear txList after consumption
 	//write ctx state to trunk
 	exec.cleanCtx.Close(false)
-	return NewNonceMatcherWithCtxAA(ctxAA, addr2idx)
+	return NewFrontierWithCtxAA(ctxAA, addr2idx)
+}
+
+func (exec *txEngine) deductGasFeeAndUpdateFrontier(sender common.Address, info *preparedInfo, entry *ctxAndAccounts) error {
+	gasFee := uint256.NewInt(0).SetUint64(info.tx.Gas)
+	gasFee.Mul(gasFee, utils.U256FromSlice32(info.tx.GasPrice[:]))
+	err := SubSenderAccBalance(entry.ctx, sender, gasFee)
+	if err != nil {
+		exec.logger.Debug("prepare::deduct gas fee failed", "txHash", info.tx.HashID.String())
+		entry.addr2Balance[sender] = uint256.NewInt(0)
+		info.errorStr = "not enough balance to pay gasfee"
+		return err
+	} else {
+		if info.tx.To == Sep206Address {
+			entry.addr2Balance[sender] = uint256.NewInt(0)
+		} else {
+			if balance, exist := entry.addr2Balance[sender]; !exist {
+				entry.addr2Balance[sender] = GetBalanceAfterBchTransfer(entry.ctx, sender, info.tx.Value)
+			} else {
+				if balance.Cmp(gasFee) < 0 {
+					entry.addr2Balance[sender] = uint256.NewInt(0)
+				} else {
+					balance.Sub(balance, gasFee)
+					txValue, _ := uint256.FromBig(utils.BigIntFromSlice32(info.tx.Value[:]))
+					if balance.Cmp(txValue) < 0 {
+						entry.addr2Balance[sender] = uint256.NewInt(0)
+					} else {
+						balance.Sub(balance, txValue)
+						entry.addr2Balance[sender] = balance
+					}
+				}
+			}
+		}
+		entry.totalGasFee.Add(entry.totalGasFee, gasFee)
+	}
+	return nil
 }
 
 func (exec *txEngine) getCurrHeight() uint64 {
