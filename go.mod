@@ -13,7 +13,7 @@ require (
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/seehuhn/mt19937 v1.0.0
 	github.com/smartbch/moeingads v0.3.0
-	github.com/smartbch/moeingdb v0.3.3
+	github.com/smartbch/moeingdb v0.3.3-0.20211208021729-0ca7b260f7f8
 	github.com/stretchr/testify v1.7.0
 	github.com/tendermint/tendermint v0.34.10
 	github.com/tinylib/msgp v1.1.5
