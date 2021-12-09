@@ -701,6 +701,9 @@ int64_t zero_depth_call(evmc_uint256be gas_price,
 		}
 	}
 	vm->destroy(vm);
+	if (result.release != nullptr) {
+		result.release(&result);
+	}
 	return gas_estimated;
 }
 
