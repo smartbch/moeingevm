@@ -249,16 +249,16 @@ public:
 			int collector_handler,
 			const evmc_result* ret_value);
 	void add_internal_tx_call(const evmc_message& msg) {
-		internal_tx_calls.push_back(msg);
-		// make a copy of data and make the pointer point to this copy
+		evmc_message msg_copy = msg;
 		data_container.emplace_back(msg.input_data, msg.input_size);
-		internal_tx_calls.back().input_data = data_container.back().data();
+		msg_copy.input_data = data_container.back().data();
+		internal_tx_calls.push_back(msg_copy);
 	}
 	void add_internal_tx_return(const evmc_result& res) {
-		internal_tx_returns.push_back(res);
-		// make a copy of data and make the pointer point to this copy
+		evmc_result res_copy = res;
 		data_container.emplace_back(res.output_data, res.output_size);
-		internal_tx_returns.back().output_data = data_container.back().data();
+		res_copy.output_data = data_container.back().data();
+		internal_tx_returns.push_back(res_copy);
 	}
 };
 
