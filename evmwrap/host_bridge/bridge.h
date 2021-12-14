@@ -65,6 +65,26 @@ struct added_log {
 	evmc_bytes32* topic4;
 };
 
+struct internal_tx_call {
+	enum evmc_call_kind kind;
+	uint32_t flags;
+	int32_t depth;
+	int64_t gas;
+	evmc_address destination;
+	evmc_address sender;
+	size_t input_offset;
+	size_t input_size;
+	evmc_uint256be value;
+};
+
+struct internal_tx_return {
+	enum evmc_status_code status_code;
+	int64_t gas_left;
+	size_t output_offset;
+	size_t output_size;
+	evmc_address create_address;
+};
+
 struct all_changed {
 	//these member pointers can point to keys and values in a hash map, 
 	//as long as the map is not rehashed.
@@ -79,9 +99,10 @@ struct all_changed {
 	struct added_log* logs;
 	size_t log_num;
 	uint64_t refund;
-	struct evmc_message* internal_tx_calls;
+	size_t data_ptr;
+	struct internal_tx_call *internal_tx_calls;
 	size_t internal_tx_call_num;
-	struct evmc_result* internal_tx_returns;
+	struct internal_tx_return* internal_tx_returns;
 	size_t internal_tx_return_num;
 };
 
