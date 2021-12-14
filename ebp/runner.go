@@ -3,8 +3,6 @@ package ebp
 import (
 	"encoding/binary"
 	"fmt"
-
-	//"fmt"
 	"runtime"
 	"sync/atomic"
 	"unsafe"
@@ -25,6 +23,8 @@ type (
 	evmc_bytes32             = C.struct_evmc_bytes32
 	evmc_message             = C.struct_evmc_message
 	evmc_result              = C.struct_evmc_result
+	internal_tx_call         = C.struct_internal_tx_call
+	internal_tx_return       = C.struct_internal_tx_return
 	changed_account          = C.struct_changed_account
 	changed_creation_counter = C.struct_changed_creation_counter
 	changed_bytecode         = C.struct_changed_bytecode
@@ -248,7 +248,6 @@ func (runner *TxRunner) changeValue(chg_value *changed_value) {
 //hash => height; height => block in db
 func (runner *TxRunner) getBlockHash(num C.uint64_t) (result evmc_bytes32) {
 	hash := runner.Ctx.GetBlockHashByHeight(uint64(num))
-	fmt.Printf("hash:%v, num:%d in getBlockHash runner\n", hash, uint64(num))
 	writeCBytes32WithSlice(&result, hash[:])
 	return
 }
@@ -309,22 +308,22 @@ func convertLog(log *added_log) (res types.EvmLog) {
 	return
 }
 
-func convertTxCalls(msg *evmc_message) (txCall types.InternalTxCall) {
+func convertTxCalls(data_ptr C.size_t, msg *internal_tx_call) (txCall types.InternalTxCall) {
 	txCall.Kind = int(msg.kind)
 	txCall.Flags = uint32(msg.flags)
 	txCall.Depth = int32(msg.depth)
 	txCall.Gas = int64(msg.gas)
 	txCall.Destination = toAddress(&msg.destination)
 	txCall.Sender = toAddress(&msg.sender)
-	txCall.Input = C.GoBytes(unsafe.Pointer(msg.input_data), C.int(msg.input_size))
+	txCall.Input = C.GoBytes(unsafe.Pointer(uintptr(data_ptr+msg.input_offset)), C.int(msg.input_size))
 	txCall.Value = toHash(&msg.value)
 	return
 }
 
-func convertTxReturns(ret *evmc_result) (txReturn types.InternalTxReturn) {
+func convertTxReturns(data_ptr C.size_t, ret *internal_tx_return) (txReturn types.InternalTxReturn) {
 	txReturn.StatusCode = int(ret.status_code)
 	txReturn.GasLeft = int64(ret.gas_left)
-	txReturn.Output = C.GoBytes(unsafe.Pointer(ret.output_data), C.int(ret.output_size))
+	txReturn.Output = C.GoBytes(unsafe.Pointer(uintptr(data_ptr+ret.output_offset)), C.int(ret.output_size))
 	txReturn.CreateAddress = toAddress(&ret.create_address)
 	return
 }
@@ -375,16 +374,16 @@ func (runner *TxRunner) collectResult(result *all_changed, ret_value *evmc_resul
 	}
 	size = int(result.internal_tx_call_num)
 	if size != 0 {
-		calls := (*[1 << 30]evmc_message)(unsafe.Pointer(result.internal_tx_calls))[:size:size]
+		calls := (*[1 << 30]internal_tx_call)(unsafe.Pointer(result.internal_tx_calls))[:size:size]
 		for _, elem := range calls {
-			runner.InternalTxCalls = append(runner.InternalTxCalls, convertTxCalls(&elem))
+			runner.InternalTxCalls = append(runner.InternalTxCalls, convertTxCalls(result.data_ptr, &elem))
 		}
 	}
 	size = int(result.internal_tx_return_num)
 	if size != 0 {
-		returns := (*[1 << 30]evmc_result)(unsafe.Pointer(result.internal_tx_returns))[:size:size]
+		returns := (*[1 << 30]internal_tx_return)(unsafe.Pointer(result.internal_tx_returns))[:size:size]
 		for _, elem := range returns {
-			runner.InternalTxReturns = append(runner.InternalTxReturns, convertTxReturns(&elem))
+			runner.InternalTxReturns = append(runner.InternalTxReturns, convertTxReturns(result.data_ptr, &elem))
 		}
 	}
 	runner.Status = int(ret_value.status_code)
@@ -475,7 +474,6 @@ func runTxHelper(idx int, currBlock *types.BlockInfo, estimateGas bool) int64 {
 	var bi block_info
 	writeCBytes20WithArray(&bi.coinbase, currBlock.Coinbase)
 	bi.number = C.int64_t(currBlock.Number)
-	fmt.Printf("currBlock.Number:%d, bi.number:%d\n", currBlock.Number, int64(bi.number))
 	bi.timestamp = C.int64_t(currBlock.Timestamp)
 	bi.gas_limit = C.int64_t(currBlock.GasLimit)
 	writeCBytes32WithSlice(&bi.difficulty, currBlock.Difficulty[:])

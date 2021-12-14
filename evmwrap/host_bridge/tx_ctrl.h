@@ -189,9 +189,9 @@ class cached_state {
 	world_state_reader* world;
 	std::vector<evm_log> logs;
 	friend struct journal_entry;
-	std::vector<evmc_message> internal_tx_calls;
-	std::vector<evmc_result> internal_tx_returns;
-	std::vector<bytes> data_container;
+	std::vector<internal_tx_call> internal_tx_calls;
+	std::vector<internal_tx_return> internal_tx_returns;
+	bytes payload_data;
 protected:
 	//the following protected functions are used by the journal_entry to undo modification
 	void _delete_account(const evmc_address& addr) {
@@ -208,7 +208,9 @@ protected:
 public:
 	uint64_t refund;
 	cached_state(world_state_reader* r):
-		accounts(), creation_counters(), bytecodes(), values(), world(r), logs(), refund() {}
+		accounts(), creation_counters(), bytecodes(), values(), world(r), logs(), refund() {
+		payload_data.reserve(2048);
+	}
 	const account_info& get_account(const evmc_address& addr);
 	void new_account(const evmc_address& addr);
 	void incr_nonce(const evmc_address& addr, bool* old_dirty);
@@ -249,16 +251,28 @@ public:
 			int collector_handler,
 			const evmc_result* ret_value);
 	void add_internal_tx_call(const evmc_message& msg) {
-		internal_tx_calls.push_back(msg);
-		// make a copy of data and make the pointer point to this copy
-		data_container.emplace_back(msg.input_data, msg.input_size);
-		internal_tx_calls.back().input_data = data_container.back().data();
+		internal_tx_call itx_call;
+		itx_call.kind = msg.kind;
+		itx_call.flags = msg.flags;
+		itx_call.depth = msg.depth;
+		itx_call.gas = msg.gas;
+		itx_call.destination = msg.destination;
+		itx_call.sender = msg.sender;
+		itx_call.input_offset = payload_data.size();
+		itx_call.input_size = msg.input_size;
+		itx_call.value = msg.value;
+		payload_data.append(msg.input_data, msg.input_size);
+		internal_tx_calls.push_back(itx_call);
 	}
 	void add_internal_tx_return(const evmc_result& res) {
-		internal_tx_returns.push_back(res);
-		// make a copy of data and make the pointer point to this copy
-		data_container.emplace_back(res.output_data, res.output_size);
-		internal_tx_returns.back().output_data = data_container.back().data();
+		internal_tx_return itx_return;
+		itx_return.status_code = res.status_code;
+		itx_return.gas_left = res.gas_left;
+		itx_return.output_offset = payload_data.size();
+		itx_return.output_size = res.output_size;
+		itx_return.create_address = res.create_address;
+		payload_data.append(res.output_data, res.output_size);
+		internal_tx_returns.push_back(itx_return);
 	}
 };
 
