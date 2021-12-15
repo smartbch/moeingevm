@@ -23,6 +23,7 @@ static inline int64_t get_precompiled_id(const evmc_address& addr) {
 static inline bool is_precompiled(int64_t id) {
 	return (1 <= id && id <= 9) ||
 	       id == STAKING_CONTRACT_ID ||
+	       id == SEP109_CONTRACT_ID ||
 	       id == SEP101_CONTRACT_ID ||
 	       id == SEP206_CONTRACT_ID;
 }
