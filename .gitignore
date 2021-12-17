@@ -18,7 +18,9 @@
 
 .idea
 *.dump
-evmwrap/evmtests/evmtests
 *.txt
 *.swp
+evmwrap/evmtests/evmtests
 evmwrap/evmtests/run_test_file
+ebp/testdbdata/
+ebp/ebptests/rocksdb.db/
