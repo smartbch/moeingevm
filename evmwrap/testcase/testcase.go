@@ -193,7 +193,7 @@ func UpdateWorldState(world *WorldState, key, value []byte) {
 }
 
 func (world WorldState) SumAllBalance() *uint256.Int {
-	res := uint256.NewInt()
+	res := uint256.NewInt(0)
 	for _, acc := range world.Accounts {
 		res.Add(res, &acc.Balance)
 	}
@@ -436,7 +436,7 @@ func ReadTestCases(filename string) (result []TestCase) {
 			//fmt.Printf("@@post !\n")
 		case cmd == "addr":
 			fillSliceFromHex(tokens, currAddress[:])
-			createAccount(currState, currAddress, uint256.NewInt().SetUint64(0))
+			createAccount(currState, currAddress, uint256.NewInt(0).SetUint64(0))
 			//fmt.Printf("@@createAccount  %v\n", currAddress)
 		case cmd == "acc_nonce":
 			currState.Accounts[currAddress].Nonce = atoi(tokens[0])
@@ -466,13 +466,13 @@ func ReadTestCases(filename string) (result []TestCase) {
 		case cmd == "block":
 			currCase.Blocks = append(currCase.Blocks, NewTestBlock())
 			currBlock = currCase.Blocks[len(currCase.Blocks)-1]
-			currBlock.ChainId = uint256.NewInt().SetUint64(1).Bytes32()
+			currBlock.ChainId = uint256.NewInt(0).SetUint64(1).Bytes32()
 		case cmd == "coinbase":
 			fillSliceFromHex(tokens, currBlock.Coinbase[:])
 		case cmd == "height":
 			currBlock.Number = int64(atoi(tokens[0]))
 		case cmd == "difficulty":
-			difficulty := uint256.NewInt()
+			difficulty := uint256.NewInt(0)
 			fillUInt256(tokens, difficulty)
 			currBlock.Difficulty = difficulty.Bytes32()
 		case cmd == "gaslimit":
