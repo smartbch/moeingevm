@@ -19,9 +19,9 @@ import (
 import "C"
 
 type (
+	//evmc_message             = C.struct_evmc_message
 	evmc_address             = C.struct_evmc_address
 	evmc_bytes32             = C.struct_evmc_bytes32
-	evmc_message             = C.struct_evmc_message
 	evmc_result              = C.struct_evmc_result
 	internal_tx_call         = C.struct_internal_tx_call
 	internal_tx_return       = C.struct_internal_tx_return
