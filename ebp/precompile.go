@@ -2,12 +2,17 @@ package ebp
 
 import (
 	"unsafe"
+	"errors"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/btcsuite/btcd/btcec"
+	"github.com/vechain/go-ecvrf"
 )
 
 //#include <stdint.h>
 import "C"
+
 
 //var PrecompiledContractsIstanbul map[common.Address]PrecompiledContract
 //func (c *ecrecover) RequiredGas(input []byte) uint64 {
@@ -22,6 +27,37 @@ import "C"
 //byte{8}): &bn256PairingIstanbul{},
 //byte{9}): &blake2F{},
 
+const (
+	VRF_VERIFY_GAS uint64 = 5000
+)
+
+type VrfVerifyContract struct {}
+
+func (vdfc *VrfVerifyContract) RequiredGas(input []byte) uint64 {
+	return VRF_VERIFY_GAS
+}
+
+func (vdfc *VrfVerifyContract) Run(input []byte) ([]byte, error) {
+	var zeros [32]byte
+	if len(input) <= 32+33 {
+		return zeros[:], errors.New("input two short")
+	}
+	// prepare input: abi.encodePacked(alpha/*uint256*/, pubKeyBytes/*33 bytes*/, pi/*variable-length bytes*/)
+	alpha := input[0:32]
+	pubKeyBytes := input[32:32+33]
+	pi := input[32+33:]
+	pubKey, err := btcec.ParsePubKey(pubKeyBytes, btcec.S256())
+	if err != nil {
+		return zeros[:], err
+	}
+	vrf := ecvrf.NewSecp256k1Sha256Tai()
+	beta, err := vrf.Verify(pubKey.ToECDSA(), alpha, pi)
+	if err != nil {
+		return zeros[:], err
+	}
+	return beta, nil
+}
+
 //export call_precompiled_contract
 func call_precompiled_contract(contract_addr *evmc_address,
 	input_ptr unsafe.Pointer,
@@ -34,7 +70,10 @@ func call_precompiled_contract(contract_addr *evmc_address,
 	*output_size = 0
 	addr := toAddress(contract_addr)
 	contract, ok := vm.PrecompiledContractsIstanbul[addr]
-	if executor, exist := PredefinedContractManager[addr]; exist {
+	if addr == common.Address([20]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x27, 0x13}) {
+		contract = &VrfVerifyContract{}
+		ok = true
+	} else if executor, exist := PredefinedContractManager[addr]; exist {
 		contract = executor
 		ok = true
 	}
