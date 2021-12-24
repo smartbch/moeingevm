@@ -20,16 +20,16 @@ static inline int64_t get_precompiled_id(const evmc_address& addr) {
 	return res;
 }
 
-static inline bool is_precompiled(int64_t id) {
+static inline bool is_precompiled(int64_t id, int64_t height) {
 	return (1 <= id && id <= 9) ||
 	       id == STAKING_CONTRACT_ID ||
-	       id == SEP109_CONTRACT_ID ||
+	       (id == SEP109_CONTRACT_ID && height >= HARD_FORK_HEIGH_1) ||
 	       id == SEP101_CONTRACT_ID ||
 	       id == SEP206_CONTRACT_ID;
 }
 
-static inline bool is_precompiled(const evmc_address& addr) {
-	return is_precompiled(get_precompiled_id(addr));
+static inline bool is_precompiled(const evmc_address& addr, int64_t height) {
+	return is_precompiled(get_precompiled_id(addr), height);
 }
 
 // following functions wrap C++ member functions into C-style functions, thus
@@ -276,7 +276,8 @@ void evmc_host_context::selfdestruct(const evmc_address& addr, const evmc_addres
 	uint256 balance = txctrl->get_balance(addr); //make a copy
 
 	const account_info& acc = txctrl->get_account(beneficiary);
-	bool is_prec = is_precompiled(beneficiary) && SELFDESTRUCT_BENEFICIARY_CANNOT_BE_PRECOMPILED;
+	bool is_prec = is_precompiled(beneficiary, txctrl->get_block_number()) &&
+			SELFDESTRUCT_BENEFICIARY_CANNOT_BE_PRECOMPILED;
 	bool zero_value = balance == uint256(0);
 	equalfn_evmc_address equalfn;
 	bool self_as_beneficiary = equalfn(beneficiary, this->msg.destination);
@@ -337,7 +338,7 @@ evmc_result evmc_host_context::call(const evmc_message& call_msg) {
 	}
 	if(normal_run) {
 		int64_t id = get_precompiled_id(call_msg.destination);
-		if(is_precompiled(id)) {
+		if(is_precompiled(id, txctrl->get_block_number())) {
 			result = ctx.run_precompiled_contract(call_msg.destination, id);
 		} else {
 			ctx.load_code(call_msg.destination);
@@ -365,7 +366,7 @@ void evmc_host_context::check_eip158() {
 static inline void transfer(tx_control* txctrl, const evmc_address& sender, const evmc_address& destination, const evmc_uint256be& value, bool* is_nop) {
 	const account_info& acc = txctrl->get_account(destination);
 	bool zero_value = is_zero_bytes32(value.bytes);
-	bool call_precompiled = is_precompiled(destination);
+	bool call_precompiled = is_precompiled(destination, txctrl->get_block_number());
 	bool is_empty = (acc.nonce == 0 && acc.balance == uint256(0) && 
 		txctrl->get_bytecode_entry(destination).bytecode.size() == 0);
 	if(acc.is_null() /*&& !call_precompiled*/) {
@@ -394,7 +395,7 @@ evmc_result evmc_host_context::call() {
 	}
 	evmc_result result;
 	int64_t id = get_precompiled_id(msg.destination);
-	if(is_precompiled(id)) {
+	if(is_precompiled(id, txctrl->get_block_number())) {
 		result = run_precompiled_contract(msg.destination, id);
 		if(result.status_code != EVMC_SUCCESS) {
 			txctrl->revert_to_snapshot(snapshot);
