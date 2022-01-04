@@ -252,7 +252,15 @@ func (c *Context) GetTxSigByHash(txHash common.Hash) [65]byte {
 }
 
 func (c *Context) GetBlockHashByHeight(height uint64) [32]byte {
-	return c.Db.GetBlockHashByHeight(int64(height))
+	var zero32 [32]byte
+	res := c.Db.GetBlockHashByHeight(int64(height))
+	if res == zero32 {
+		blk, err := c.GetBlockByHeight(height)
+		if err != nil {
+			return blk.Hash
+		}
+	}
+	return res
 }
 
 func (c *Context) GetBlockByHeight(height uint64) (*Block, error) {
