@@ -106,6 +106,9 @@ struct all_changed {
 	size_t internal_tx_return_num;
 };
 
+struct config {
+	bool after_xhedge_fork;
+};
 
 // Go environment passes information about a block through this struct to C environment
 struct block_info {
@@ -115,6 +118,7 @@ struct block_info {
 	int64_t gas_limit;         /**< The block gas limit. */
 	struct evmc_bytes32 difficulty; /**< The block difficulty. */
 	struct evmc_bytes32 chain_id;   /**< The blockchain's ChainID. */
+	struct config cfg;
 };
 
 // a big buffer is large enough to contain a 24KB bytecode
