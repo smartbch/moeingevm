@@ -314,20 +314,20 @@ func (c *Context) CheckNonce(sender common.Address, nonce uint64) (*AccountInfo,
 	return acc, nil
 }
 
-func (c *Context) DeductTxFeeWithSpecificNonce(sender common.Address, acc *AccountInfo, txGas uint64, gasPrice *uint256.Int, newNonce uint64) error {
-	acc.UpdateNonce(newNonce)
-	var gasFee, gas uint256.Int
-	gas.SetUint64(txGas)
-	gasFee.Mul(&gas, gasPrice)
-	x := acc.Balance()
-	if x.Cmp(&gasFee) < 0 {
-		return errors.New("account balance is not enough for fee")
-	}
-	x.Sub(x, &gasFee)
-	acc.UpdateBalance(x)
-	c.SetAccount(sender, acc)
-	return nil
-}
+//func (c *Context) DeductTxFeeWithSpecificNonce(sender common.Address, acc *AccountInfo, txGas uint64, gasPrice *uint256.Int, newNonce uint64) error {
+//	acc.UpdateNonce(newNonce)
+//	var gasFee, gas uint256.Int
+//	gas.SetUint64(txGas)
+//	gasFee.Mul(&gas, gasPrice)
+//	x := acc.Balance()
+//	if x.Cmp(&gasFee) < 0 {
+//		return errors.New("account balance is not enough for fee")
+//	}
+//	x.Sub(x, &gasFee)
+//	acc.UpdateBalance(x)
+//	c.SetAccount(sender, acc)
+//	return nil
+//}
 
 func isInTopicSlice(topic [32]byte, topics [][32]byte) bool {
 	for _, t := range topics {

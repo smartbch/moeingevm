@@ -78,14 +78,14 @@ type ctxAndAccounts struct {
 type frontier struct {
 	addr2nonce   map[common.Address]uint64
 	addr2Balance map[common.Address]*uint256.Int //caches latest balance
-	addr2GasLimit map[common.Address]uint64 //cache total txGasLimit during one block
+	addr2Gas     map[common.Address]uint64 //cache total txGas during one block
 }
 
 func NewFrontierWithCtxAA(ctxAA []*ctxAndAccounts, addr2idx map[common.Address]int) *frontier {
 	nm := frontier{
-		addr2nonce: make(map[common.Address]uint64),
+		addr2nonce:   make(map[common.Address]uint64),
 		addr2Balance: make(map[common.Address]*uint256.Int),
-		addr2GasLimit: make(map[common.Address]uint64),
+		addr2Gas:     make(map[common.Address]uint64),
 	}
 	for addr, idx := range addr2idx {
 		if nonce, ok := ctxAA[idx].addr2nonce[addr]; ok {
@@ -130,26 +130,26 @@ func (nm *frontier) SetLatestBalance(addr common.Address, balance *uint256.Int) 
 	nm.addr2Balance[addr] = balance
 }
 
-func (nm *frontier) GetLatestTotalGasLimit(addr common.Address) (gasLimit uint64, exist bool) {
+func (nm *frontier) GetLatestTotalGas(addr common.Address) (gasLimit uint64, exist bool) {
 	if nm == nil {
 		return 0, false
 	}
-	gasLimit, exist = nm.addr2GasLimit[addr]
+	gasLimit, exist = nm.addr2Gas[addr]
 	return gasLimit, exist
 }
 
-func (nm *frontier) SetLatestTotalGasLimit(addr common.Address, gasLimit uint64) {
+func (nm *frontier) SetLatestTotalGas(addr common.Address, gasLimit uint64) {
 	if nm == nil {
 		return
 	}
-	nm.addr2GasLimit[addr] = gasLimit
+	nm.addr2Gas[addr] = gasLimit
 }
 
 func GetEmptyFrontier() Frontier {
 	return &frontier{
 		addr2nonce: make(map[common.Address]uint64),
 		addr2Balance: make(map[common.Address]*uint256.Int),
-		addr2GasLimit: make(map[common.Address]uint64),
+		addr2Gas: make(map[common.Address]uint64),
 	}
 }
 
