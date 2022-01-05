@@ -231,12 +231,13 @@ func (c *Context) GetTxByBlkHtAndTxIndex(height uint64, index uint64) *Transacti
 	return tx
 }
 
-func (c *Context) GetTxByHash(txHash common.Hash) (tx *Transaction, err error) {
+func (c *Context) GetTxByHash(txHash common.Hash) (tx *Transaction, sig [65]byte, err error) {
 	c.Db.GetTxByHash(txHash, func(b []byte) bool {
 		tmp := &Transaction{}
-		_, err := tmp.UnmarshalMsg(b)
+		_, err := tmp.UnmarshalMsg(b[65:])
 		if err == nil && bytes.Equal(tmp.Hash[:], txHash[:]) {
 			tx = tmp
+			copy(sig[:], b[:65])
 			return true // stop retry
 		}
 		return false
@@ -245,10 +246,6 @@ func (c *Context) GetTxByHash(txHash common.Hash) (tx *Transaction, err error) {
 		err = ErrTxNotFound
 	}
 	return
-}
-
-func (c *Context) GetTxSigByHash(txHash common.Hash) [65]byte {
-	return c.Db.GetTxSigByHash(txHash)
 }
 
 func (c *Context) GetBlockHashByHeight(height uint64) [32]byte {
@@ -349,7 +346,7 @@ func (c *Context) BasicQueryLogs(address common.Address, topics []common.Hash,
 			return false
 		}
 		tx := Transaction{}
-		if _, err = tx.UnmarshalMsg(data); err != nil {
+		if _, err = tx.UnmarshalMsg(data[65:]); err != nil {
 			return false
 		}
 		for _, log := range tx.Logs {
@@ -388,7 +385,7 @@ func (c *Context) QueryLogs(addresses []common.Address, topics [][]common.Hash, 
 			return false
 		}
 		tx := Transaction{}
-		if _, err = tx.UnmarshalMsg(data); err != nil {
+		if _, err = tx.UnmarshalMsg(data[65:]); err != nil {
 			return false
 		}
 
@@ -407,14 +404,17 @@ func (c *Context) QueryLogs(addresses []common.Address, topics [][]common.Hash, 
 	return
 }
 
-func (c *Context) QueryTxBySrc(addr common.Address, startHeight, endHeight, limit uint32) (txs []*Transaction, err error) {
+func (c *Context) QueryTxBySrc(addr common.Address, startHeight, endHeight, limit uint32) (txs []*Transaction, sigs [][65]byte, err error) {
 	c.Db.QueryTxBySrc(addr, startHeight, endHeight, func(data []byte) bool {
 		if data == nil {
 			err = ErrTooManyEntries
 			return false
 		}
+		var sig [65]byte
+		copy(sig[:], data[:65])
+		sigs = append(sigs, sig)
 		tx := Transaction{}
-		if _, err = tx.UnmarshalMsg(data); err != nil {
+		if _, err = tx.UnmarshalMsg(data[65:]); err != nil {
 			return false
 		}
 		if bytes.Equal(tx.From[:], addr[:]) { // compare them to prevent hash-conflict corner case
@@ -428,14 +428,17 @@ func (c *Context) QueryTxBySrc(addr common.Address, startHeight, endHeight, limi
 	return
 }
 
-func (c *Context) QueryTxByDst(addr common.Address, startHeight, endHeight, limit uint32) (txs []*Transaction, err error) {
+func (c *Context) QueryTxByDst(addr common.Address, startHeight, endHeight, limit uint32) (txs []*Transaction, sigs [][65]byte, err error) {
 	c.Db.QueryTxByDst(addr, startHeight, endHeight, func(data []byte) bool {
 		if data == nil {
 			err = ErrTooManyEntries
 			return false
 		}
+		var sig [65]byte
+		copy(sig[:], data[:65])
+		sigs = append(sigs, sig)
 		tx := Transaction{}
-		if _, err = tx.UnmarshalMsg(data); err != nil {
+		if _, err = tx.UnmarshalMsg(data[65:]); err != nil {
 			return false
 		}
 		if bytes.Equal(tx.To[:], addr[:]) { // compare them to prevent hash-conflict corner case
@@ -449,14 +452,17 @@ func (c *Context) QueryTxByDst(addr common.Address, startHeight, endHeight, limi
 	return
 }
 
-func (c *Context) QueryTxByAddr(addr common.Address, startHeight, endHeight, limit uint32) (txs []*Transaction, err error) {
+func (c *Context) QueryTxByAddr(addr common.Address, startHeight, endHeight, limit uint32) (txs []*Transaction, sigs [][65]byte, err error) {
 	c.Db.QueryTxBySrcOrDst(addr, startHeight, endHeight, func(data []byte) bool {
 		if data == nil {
 			err = ErrTooManyEntries
 			return false
 		}
+		var sig [65]byte
+		copy(sig[:], data[:65])
+		sigs = append(sigs, sig)
 		tx := Transaction{}
-		if _, err = tx.UnmarshalMsg(data); err != nil {
+		if _, err = tx.UnmarshalMsg(data[65:]); err != nil {
 			return false
 		}
 		if bytes.Equal(tx.From[:], addr[:]) || bytes.Equal(tx.To[:], addr[:]) {
@@ -470,21 +476,23 @@ func (c *Context) QueryTxByAddr(addr common.Address, startHeight, endHeight, lim
 	return
 }
 
-func (c *Context) GetTxListByHeight(height uint32) (txs []*Transaction, err error) {
+func (c *Context) GetTxListByHeight(height uint32) (txs []*Transaction, sigs [][65]byte, err error) {
 	return c.GetTxListByHeightWithRange(height, 0, math.MaxInt32)
 }
 
-func (c *Context) GetTxListByHeightWithRange(height uint32, start, end int) (txs []*Transaction, err error) {
+func (c *Context) GetTxListByHeightWithRange(height uint32, start, end int) (txs []*Transaction, sigs [][65]byte, err error) {
 	txContents := c.Db.GetTxListByHeightWithRange(int64(height), start, end)
 	txs = make([]*Transaction, len(txContents))
+	sigs = make([][65]byte, len(txContents))
 	for i, txContent := range txContents {
+		copy(sigs[i][:], txContent[:65])
 		txs[i] = &Transaction{}
-		_, err = txs[i].UnmarshalMsg(txContent)
+		_, err = txs[i].UnmarshalMsg(txContent[65:])
 		if err != nil {
 			break
 		}
 	}
-	return txs, err
+	return
 }
 
 // return the times addr acts as the to-address of a transaction
