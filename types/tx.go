@@ -12,48 +12,48 @@ const (
 
 type InternalTxCall struct {
 	/** The kind of the call. For zero-depth calls ::EVMC_CALL SHOULD be used. */
-	Kind int `msgp:"kind"`
+	Kind int `msg:"kind"`
 
 	/**
 	* Additional flags modifying the call execution behavior.
 	* In the current version the only valid values are ::EVMC_STATIC or 0.
 	 */
-	Flags uint32 `msgp:"flags"`
+	Flags uint32 `msg:"flags"`
 
 	/** The call depth. */
-	Depth int32 `msgp:"depth"`
+	Depth int32 `msg:"depth"`
 
 	/** The amount of gas for message execution. */
 	Gas int64
 
 	/** The callee of the transaction. */
-	Destination [20]byte `msgp:"destination"`
+	Destination [20]byte `msg:"destination"`
 
 	/** The caller of the transaction. */
-	Sender [20]byte `msgp:"sender"`
+	Sender [20]byte `msg:"sender"`
 
 	/** the input data.  */
-	Input []byte `msgp:"input"`
+	Input []byte `msg:"input"`
 
 	/**
 	* The amount of BCH transferred with the message.
 	 */
-	Value [32]byte `msgp:"value"`
+	Value [32]byte `msg:"value"`
 }
 
 type InternalTxReturn struct {
 	/** The execution status code. */
-	StatusCode int `msgp:"statusCode"`
+	StatusCode int `msg:"statusCode"`
 
 	/**
 	* The amount of gas left after the execution.
 	* If StatusCode is neither ::EVMC_SUCCESS nor ::EVMC_REVERT
 	* the value MUST be 0.
 	 */
-	GasLeft int64 `msgp:"gasLeft"`
+	GasLeft int64 `msg:"gasLeft"`
 
 	/**  the output data.  */
-	Output []byte `msgp:"output"`
+	Output []byte `msg:"output"`
 
 	/**
 	* The address of the contract created by create instructions.
@@ -64,34 +64,68 @@ type InternalTxReturn struct {
 	*   (StatusCode is ::EVMC_SUCCESS).
 	* In all other cases the address MUST be null bytes.
 	 */
-	CreateAddress [20]byte `msgp:"createAddress"`
+	CreateAddress [20]byte `msg:"createAddress"`
 }
 
 type Log struct {
 	// Consensus fields:
 	// address of the contract that generated the event
-	Address [20]byte `msgp:"address"`
+	Address [20]byte `msg:"address"`
 	// list of topics provided by the contract.
-	Topics [][32]byte `msgp:"topics"`
+	Topics [][32]byte `msg:"topics"`
 	// supplied by the contract, usually ABI-encoded
-	Data []byte `msgp:"data"`
+	Data []byte `msg:"data"`
 
 	// Derived fields. These fields are filled in by the node
 	// but not secured by consensus.
 	// block in which the transaction was included
-	BlockNumber uint64 `msgp:"blockNumber"`
+	BlockNumber uint64 `msg:"blockNumber"`
 	// hash of the transaction
-	TxHash [32]byte `msgp:"transactionHash"`
+	TxHash [32]byte `msg:"transactionHash"`
 	// index of the transaction in the block
-	TxIndex uint `msgp:"transactionIndex"`
+	TxIndex uint `msg:"transactionIndex"`
 	// hash of the block in which the transaction was included
-	BlockHash [32]byte `msgp:"blockHash"`
+	BlockHash [32]byte `msg:"blockHash"`
 	// index of the log in the block
-	Index uint `msgp:"logIndex"`
+	Index uint `msg:"logIndex"`
 
 	// The Removed field is true if this log was reverted due to a chain reorganisation.
 	// You must pay attention to this field if you receive logs through a filter query.
-	Removed bool `msgp:"removed"`
+	Removed bool `msg:"removed"`
+}
+
+type CreationCounterRWOp struct {
+	Lsb     uint8  `msg:"lsb"`
+	Counter uint64 `msg:"counter"`
+}
+type AccountRWOp struct {
+	Addr    [20]byte `msg:"addr"`
+	Account []byte   `msg:"account"`
+}
+type BytecodeRWOp struct {
+	Addr     [20]byte `msg:"addr"`
+	Bytecode []byte   `msg:"bytecode"`
+}
+type StorageRWOp struct {
+	Seq   uint64 `msg:"seq"`
+	Key   string `msg:"key"`
+	Value []byte `msg:"value"`
+}
+type BlockHashOp struct {
+	Height uint64   `msg:"height"`
+	Hash   [32]byte `msg:"hash"`
+}
+
+type ReadWriteLists struct {
+	CreationCounterRList []CreationCounterRWOp `msg:"creationcounter_rlist"`
+	CreationCounterWList []CreationCounterRWOp `msg:"creationcounter_wlist"`
+	AccountRList         []AccountRWOp         `msg:"account_rlist"`
+	AccountWList         []AccountRWOp         `msg:"account_wlist"`
+	BytecodeRList        []BytecodeRWOp        `msg:"bytecode_rlist"`
+	BytecodeWList        []BytecodeRWOp        `msg:"bytecode_wlist"`
+	StorageRList         []StorageRWOp         `msg:"storage_rlist"`
+	StorageWList         []StorageRWOp         `msg:"storage_wlist"`
+	BlockHashList        []BlockHashOp         `msg:"blockhash_list"`
 }
 
 //logs are objects with following params (Using types.Log is OK):
@@ -128,8 +162,10 @@ type Transaction struct {
 	OutData           []byte    `msg:"outdata"`      //the output data from the transaction
 	//PostState  []byte  //look at Receipt.PostState
 
-	InternalTxCalls   []InternalTxCall   `msg:"internalTxCalls"`
-	InternalTxReturns []InternalTxReturn `msg:"internalTxReturns"`
+	InternalTxCalls   []InternalTxCall   `msg:"itxcalls"`
+	InternalTxReturns []InternalTxReturn `msg:"itxreturns"`
+
+	RwLists    *ReadWriteLists `msg:"rwlist"`
 }
 
 //TRANSACTION RECEIPT - A transaction receipt object, or null when no receipt was found:

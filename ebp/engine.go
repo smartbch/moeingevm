@@ -511,10 +511,7 @@ func (exec *txEngine) runTxInParallel(txRange *TxRange, txBundle []types.TxToRun
 			if myIdx >= int64(len(txBundle)) {
 				return
 			}
-			Runners[myIdx] = &TxRunner{
-				Ctx: exec.cleanCtx.WithRbtCopy(),
-				Tx:  &txBundle[myIdx],
-			}
+			Runners[myIdx] = NewTxRunner(exec.cleanCtx.WithRbtCopy(), &txBundle[myIdx]);
 			k := types.GetStandbyTxKey(txRange.start + uint64(myIdx))
 			Runners[myIdx].Ctx.Rbt.GetBaseStore().PrepareForDeletion(k) // remove it from the standby queue
 			k = types.GetStandbyTxKey(txRange.end + uint64(myIdx))
@@ -629,6 +626,7 @@ func (exec *txEngine) collectCommittableTxs(committableRunnerList []*TxRunner) {
 			StatusStr:         StatusToStr(runner.Status),
 			InternalTxCalls:   runner.InternalTxCalls,
 			InternalTxReturns: runner.InternalTxReturns,
+			RwLists:           runner.RwLists,
 		}
 		exec.logger.Debug("collectCommittableTxs:", "status", tx.StatusStr, "hash", common.Hash(tx.Hash).String())
 		if StatusIsFailure(runner.Status) {
