@@ -12,7 +12,7 @@ require (
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/seehuhn/mt19937 v1.0.0
-	github.com/smartbch/moeingads v0.3.1-0.20220104120004-eee2e252096c
+	github.com/smartbch/moeingads v0.3.1-0.20220110090835-5b9f0dad0a9e
 	github.com/smartbch/moeingdb v0.3.5-0.20220105145349-f4305c5643bb
 	github.com/stretchr/testify v1.7.0
 	github.com/tendermint/tendermint v0.34.10

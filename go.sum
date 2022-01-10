@@ -568,6 +568,8 @@ github.com/smartbch/moeingads v0.3.1-0.20220104075733-cdabfb5e1c5e h1:yG75Aa+ZPm
 github.com/smartbch/moeingads v0.3.1-0.20220104075733-cdabfb5e1c5e/go.mod h1:D0LaKAsnls5FYYRYp8/pzac/ItKoYr4vBic/q1RYZlg=
 github.com/smartbch/moeingads v0.3.1-0.20220104120004-eee2e252096c h1:HeWpGZmm+YL2vOxp4WQ8HwnRhg+PqkDTgzNyRyRw9/s=
 github.com/smartbch/moeingads v0.3.1-0.20220104120004-eee2e252096c/go.mod h1:D0LaKAsnls5FYYRYp8/pzac/ItKoYr4vBic/q1RYZlg=
+github.com/smartbch/moeingads v0.3.1-0.20220110090835-5b9f0dad0a9e h1:VCS/ghx5OeVzhQfPh74tyqdlxzHK8pyTfbn+5qgKtcQ=
+github.com/smartbch/moeingads v0.3.1-0.20220110090835-5b9f0dad0a9e/go.mod h1:D0LaKAsnls5FYYRYp8/pzac/ItKoYr4vBic/q1RYZlg=
 github.com/smartbch/moeingdb v0.3.3-0.20211208021729-0ca7b260f7f8 h1:AP1V12x2I3Ujx8mnzEpHos6DQ8ENdRXtLINGOdI9PLI=
 github.com/smartbch/moeingdb v0.3.3-0.20211208021729-0ca7b260f7f8/go.mod h1:r23LK/bZwDMypQiPbfQXYnBPQJOLxXe2mjGBf4H6wXs=
 github.com/smartbch/moeingdb v0.3.5-0.20220105145349-f4305c5643bb h1:jWDkUjRdXiyHuFDy5E+AF+ENDKIL6LWUmXtb8hXceF4=
