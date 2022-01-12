@@ -206,7 +206,6 @@ func (runner *TxRunner) getAccountInfo(addr_ptr *evmc_address, balance *evmc_byt
 		return
 	}
 	op := types.AccountRWOp{Account: acc.Bytes(), Addr: addr}
-	fmt.Printf("%#v\n", runner.RwLists)
 	runner.RwLists.AccountRList = append(runner.RwLists.AccountRList, op)
 }
 
