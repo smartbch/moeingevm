@@ -224,7 +224,7 @@ func runTestcases(hisdbDir, rpcUrl string) {
 	hisDb := NewHisDb(hisdbDir)
 	go hisDb.GenerateRecords(recChan)
 	for rec := range recChan {
-		mid := rand.Intn(int(rec.EndHeight) - int(rec.StartHeight)) + int(rec.StartHeight)
+		mid := rand.Intn(int(rec.EndHeight)-int(rec.StartHeight)) + int(rec.StartHeight)
 		if rec.Key == "account" {
 			runAccountTestcase(rec, ethCli, rec.StartHeight)
 			runAccountTestcase(rec, ethCli, uint64(mid))
@@ -302,3 +302,27 @@ func runStorageTestcase(rec HistoricalRecord, ethCli *ethclient.Client, height u
 	}
 }
 
+func testTheOnlyTxInBlocks(modbDir, rpcUrl string, endHeight uint64) {
+	modb := modb.NewMoDB(modbDir, log.NewNopLogger())
+	ctx := types.NewContext(nil, modb)
+	ethCli := getEthClient(rpcUrl)
+	for h := uint64(0); h < endHeight; h++ {
+		blk, err := ctx.GetBlockByHeight(h)
+		if err != nil {
+			panic(err)
+		}
+		if len(blk.Transactions) != 1 {
+			continue
+		}
+		txHash := blk.Transactions[0]
+		tx, _, err := ctx.GetTxByHash(txHash)
+		if err != nil {
+			panic(err)
+		}
+		testTheOnlyTx(tx, ethCli)
+	}
+}
+
+func testTheOnlyTx(tx *types.Transaction, ethCli *ethclient.Client) {
+	// TODO: check sbch_call using tx.RwLists
+}
