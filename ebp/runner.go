@@ -191,7 +191,7 @@ func (runner *TxRunner) changeCreationCounter(chg_counter *changed_creation_coun
 	runner.RwLists.CreationCounterWList = append(runner.RwLists.CreationCounterWList,
 		types.CreationCounterRWOp{Lsb: uint8(chg_counter.lsb), Counter: uint64(chg_counter.counter)})
 }
-	
+
 func (runner *TxRunner) getAccountInfo(addr_ptr *evmc_address, balance *evmc_bytes32, nonce *C.uint64_t, sequence *C.uint64_t) {
 	addr := toAddress(addr_ptr)
 	acc := runner.Ctx.GetAccount(addr)
@@ -490,6 +490,7 @@ func runTx(idx int, currBlock *types.BlockInfo) {
 }
 
 func RunTxForRpc(currBlock *types.BlockInfo, estimateGas bool, runner *TxRunner) int64 {
+	fmt.Printf("RunTxForRpc height %d\n", currBlock.Number)
 	idx := getFreeRpcRunnerAndLockIt()
 	RpcRunners[idx] = runner
 	defer func() {

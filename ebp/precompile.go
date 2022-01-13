@@ -1,18 +1,17 @@
 package ebp
 
 import (
-	"unsafe"
 	"errors"
+	"unsafe"
 
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/btcsuite/btcd/btcec"
 	"github.com/vechain/go-ecvrf"
 )
 
 //#include <stdint.h>
 import "C"
-
 
 //var PrecompiledContractsIstanbul map[common.Address]PrecompiledContract
 //func (c *ecrecover) RequiredGas(input []byte) uint64 {
@@ -31,7 +30,7 @@ const (
 	VRF_VERIFY_GAS uint64 = 5000
 )
 
-type VrfVerifyContract struct {}
+type VrfVerifyContract struct{}
 
 func (vdfc *VrfVerifyContract) RequiredGas(input []byte) uint64 {
 	return VRF_VERIFY_GAS
@@ -44,7 +43,7 @@ func (vdfc *VrfVerifyContract) Run(input []byte) ([]byte, error) {
 	}
 	// prepare input: abi.encodePacked(alpha/*uint256*/, pubKeyBytes/*33 bytes*/, pi/*variable-length bytes*/)
 	alpha := input[0:32]
-	pubKeyBytes := input[32:32+33]
+	pubKeyBytes := input[32 : 32+33]
 	pi := input[32+33:]
 	pubKey, err := btcec.ParsePubKey(pubKeyBytes, btcec.S256())
 	if err != nil {

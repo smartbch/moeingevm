@@ -78,7 +78,7 @@ type ctxAndAccounts struct {
 type frontier struct {
 	addr2nonce   map[common.Address]uint64
 	addr2Balance map[common.Address]*uint256.Int //caches latest balance
-	addr2Gas     map[common.Address]uint64 //cache total txGas during one block
+	addr2Gas     map[common.Address]uint64       //cache total txGas during one block
 }
 
 func NewFrontierWithCtxAA(ctxAA []*ctxAndAccounts, addr2idx map[common.Address]int) *frontier {
@@ -147,9 +147,9 @@ func (nm *frontier) SetLatestTotalGas(addr common.Address, gasLimit uint64) {
 
 func GetEmptyFrontier() Frontier {
 	return &frontier{
-		addr2nonce: make(map[common.Address]uint64),
+		addr2nonce:   make(map[common.Address]uint64),
 		addr2Balance: make(map[common.Address]*uint256.Int),
-		addr2Gas: make(map[common.Address]uint64),
+		addr2Gas:     make(map[common.Address]uint64),
 	}
 }
 
@@ -511,7 +511,7 @@ func (exec *txEngine) runTxInParallel(txRange *TxRange, txBundle []types.TxToRun
 			if myIdx >= int64(len(txBundle)) {
 				return
 			}
-			Runners[myIdx] = NewTxRunner(exec.cleanCtx.WithRbtCopy(), &txBundle[myIdx]);
+			Runners[myIdx] = NewTxRunner(exec.cleanCtx.WithRbtCopy(), &txBundle[myIdx])
 			k := types.GetStandbyTxKey(txRange.start + uint64(myIdx))
 			Runners[myIdx].Ctx.Rbt.GetBaseStore().PrepareForDeletion(k) // remove it from the standby queue
 			k = types.GetStandbyTxKey(txRange.end + uint64(myIdx))

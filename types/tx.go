@@ -165,7 +165,7 @@ type Transaction struct {
 	InternalTxCalls   []InternalTxCall   `msg:"itxcalls"`
 	InternalTxReturns []InternalTxReturn `msg:"itxreturns"`
 
-	RwLists    *ReadWriteLists `msg:"rwlist"`
+	RwLists *ReadWriteLists `msg:"rwlist"`
 }
 
 //TRANSACTION RECEIPT - A transaction receipt object, or null when no receipt was found:
