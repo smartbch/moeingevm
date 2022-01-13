@@ -2,11 +2,21 @@ package historydb
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
+	"fmt"
 	"math"
+	"math/big"
+	"math/rand"
+	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	it "github.com/smartbch/moeingads/indextree"
 	adstypes "github.com/smartbch/moeingads/types"
+	"github.com/smartbch/moeingdb/modb"
+	"github.com/tendermint/tendermint/libs/log"
 
 	"github.com/smartbch/moeingevm/types"
 )
@@ -16,6 +26,8 @@ const (
 	AccountByte         = byte(102)
 	BytecodeByte        = byte(104)
 	StorageByte         = byte(106)
+
+	Timeout = time.Second * 15
 )
 
 // You can use HistoricalRecord to send requests to RPC and check the result
@@ -183,6 +195,110 @@ func (db *HistoryDb) GenerateRecords(recChan chan HistoricalRecord) {
 		}
 		recChan <- currRec
 		currRec = getRecord(key, value)
+		iter.Next()
 	}
 	recChan <- currRec
 }
+
+// -------------------------------------------------------------------------------
+
+func generateHisDb(modbDir, hisdbDir string, endHeight uint64) {
+	modb := modb.NewMoDB(modbDir, log.NewNopLogger())
+	ctx := types.NewContext(nil, modb)
+	hisDb := NewHisDb(hisdbDir)
+	hisDb.Fill(ctx, endHeight)
+	hisDb.Close()
+}
+
+func getEthClient(rpcUrl string) *ethclient.Client {
+	rpcCli, err := rpc.DialContext(context.Background(), rpcUrl)
+	if err != nil {
+		panic(err)
+	}
+	return ethclient.NewClient(rpcCli)
+}
+
+func runTestcases(hisdbDir, rpcUrl string) {
+	ethCli := getEthClient(rpcUrl)
+	recChan := make(chan HistoricalRecord, 100)
+	hisDb := NewHisDb(hisdbDir)
+	go hisDb.GenerateRecords(recChan)
+	for rec := range recChan {
+		mid := rand.Intn(int(rec.EndHeight) - int(rec.StartHeight)) + int(rec.StartHeight)
+		if rec.Key == "account" {
+			runAccountTestcase(rec, ethCli, rec.StartHeight)
+			runAccountTestcase(rec, ethCli, uint64(mid))
+			runAccountTestcase(rec, ethCli, rec.EndHeight-1)
+		} else if rec.Key == "bytecode" {
+			runBytecodeTestcase(rec, ethCli, rec.StartHeight)
+			runBytecodeTestcase(rec, ethCli, uint64(mid))
+			runBytecodeTestcase(rec, ethCli, rec.EndHeight-1)
+		} else if len(rec.Key) == 32 {
+			runStorageTestcase(rec, ethCli, rec.StartHeight)
+			runStorageTestcase(rec, ethCli, uint64(mid))
+			runStorageTestcase(rec, ethCli, rec.EndHeight-1)
+		} else {
+			panic("Invalid rec.Key")
+		}
+	}
+}
+
+func runAccountTestcase(rec HistoricalRecord, ethCli *ethclient.Client, height uint64) {
+	h := big.NewInt(int64(height))
+	accInfo := types.NewAccountInfo(rec.Value)
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+
+	nonce, err := ethCli.NonceAt(ctx, common.Address(rec.Addr), h)
+	if err != nil {
+		panic(err)
+	}
+	if accInfo.Nonce() != nonce {
+		fmt.Printf("height %d acc %s\n", height, common.Address(rec.Addr))
+		fmt.Printf("nonce ref %d imp %d", accInfo.Nonce(), nonce)
+	}
+	balance, err := ethCli.NonceAt(ctx, common.Address(rec.Addr), h)
+	if err != nil {
+		panic(err)
+	}
+	if accInfo.Balance().Uint64() != balance {
+		fmt.Printf("account %d acc %s\n", height, common.Address(rec.Addr))
+		fmt.Printf("balance ref %d imp %d", accInfo.Balance().Uint64(), balance)
+	}
+}
+
+func runBytecodeTestcase(rec HistoricalRecord, ethCli *ethclient.Client, height uint64) {
+	h := big.NewInt(int64(height))
+	bcInfo := types.NewBytecodeInfo(rec.Value)
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+
+	bytecode, err := ethCli.CodeAt(ctx, common.Address(rec.Addr), h)
+	if err != nil {
+		panic(err)
+	}
+	if !bytes.Equal(bcInfo.BytecodeSlice(), bytecode) {
+		fmt.Printf("bytecode %d acc %s\n", height, common.Address(rec.Addr))
+		fmt.Printf("ref %#v\n", bcInfo.BytecodeSlice())
+		fmt.Printf("imp %#v\n", bytecode)
+	}
+}
+
+func runStorageTestcase(rec HistoricalRecord, ethCli *ethclient.Client, height uint64) {
+	h := big.NewInt(int64(height))
+	ctx, cancel := context.WithTimeout(context.Background(), Timeout)
+	defer cancel()
+
+	var key common.Hash
+	copy(key[:], rec.Key)
+	value, err := ethCli.StorageAt(ctx, common.Address(rec.Addr), key, h)
+	if err != nil {
+		panic(err)
+	}
+	if !bytes.Equal(rec.Value, value) {
+		fmt.Printf("storage %d acc %s\n", height, common.Address(rec.Addr))
+		fmt.Printf("ref %#v\n", rec.Value)
+		fmt.Printf("imp %#v\n", value)
+	}
+}
+
