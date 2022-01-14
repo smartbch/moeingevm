@@ -37,4 +37,3 @@ func main() {
 		fmt.Printf("%#v\n", tx)
 	}
 }
-

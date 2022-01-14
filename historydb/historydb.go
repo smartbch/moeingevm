@@ -257,11 +257,11 @@ func runAccountTestcase(rec HistoricalRecord, ethCli *ethclient.Client, height u
 		fmt.Printf("height %d acc %s\n", height, common.Address(rec.Addr))
 		fmt.Printf("nonce ref %d imp %d", accInfo.Nonce(), nonce)
 	}
-	balance, err := ethCli.NonceAt(ctx, common.Address(rec.Addr), h)
+	balance, err := ethCli.BalanceAt(ctx, common.Address(rec.Addr), h)
 	if err != nil {
 		panic(err)
 	}
-	if accInfo.Balance().Uint64() != balance {
+	if accInfo.Balance().Uint64() != balance.Uint64() {
 		fmt.Printf("account %d acc %s\n", height, common.Address(rec.Addr))
 		fmt.Printf("balance ref %d imp %d", accInfo.Balance().Uint64(), balance)
 	}
