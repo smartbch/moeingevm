@@ -261,9 +261,9 @@ func runAccountTestcase(rec HistoricalRecord, ethCli *ethclient.Client, height u
 	if err != nil {
 		panic(err)
 	}
-	if accInfo.Balance().Uint64() != balance.Uint64() {
+	if accInfo.Balance().ToBig().Cmp(balance) != 0 {
 		fmt.Printf("account %d acc %s\n", height, common.Address(rec.Addr))
-		fmt.Printf("balance ref %d imp %d", accInfo.Balance().Uint64(), balance)
+		fmt.Printf("balance ref %s imp %s", accInfo.Balance(), balance)
 	}
 }
 
