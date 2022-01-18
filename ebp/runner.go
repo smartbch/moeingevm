@@ -225,6 +225,9 @@ func (runner *TxRunner) changeAccount(chg_acc *changed_account) {
 	if !EnableRWList {
 		return
 	}
+	if addr == runner.Tx.From {
+		return // We cannot get correct data here without refund 
+	}
 	op := types.AccountRWOp{Account: acc.Bytes(), Addr: addr}
 	runner.RwLists.AccountWList = append(runner.RwLists.AccountWList, op)
 }
@@ -346,7 +349,13 @@ func (runner *TxRunner) refundGasFee(ret_value *evmc_result, refund C.uint64_t) 
 	runner.Ctx.Rbt.Set(k, acc.Bytes())
 	runner.FeeRefund = returnedGasFee
 	runner.GasUsed = gasUsed
+	if !EnableRWList {
+		return
+	}
+	op := types.AccountRWOp{Account: acc.Bytes(), Addr: runner.Tx.From}
+	runner.RwLists.AccountWList = append(runner.RwLists.AccountWList, op)
 }
+
 func (runner *TxRunner) GetGasFee() *uint256.Int {
 	return uint256.NewInt(0).Mul(uint256.NewInt(runner.GasUsed),
 		uint256.NewInt(0).SetBytes(runner.Tx.GasPrice[:]))
