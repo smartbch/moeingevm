@@ -37,7 +37,7 @@ type (
 )
 
 const (
-	EnableRWList = true
+	EnableRWList = false
 )
 
 var PredefinedContractManager map[common.Address]types.SystemContractExecutor
