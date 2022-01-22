@@ -226,7 +226,7 @@ func (runner *TxRunner) changeAccount(chg_acc *changed_account) {
 		return
 	}
 	if addr == runner.Tx.From {
-		return // We cannot get correct data here without refund 
+		return // We cannot get correct data here without refund
 	}
 	op := types.AccountRWOp{Account: acc.Bytes(), Addr: addr}
 	runner.RwLists.AccountWList = append(runner.RwLists.AccountWList, op)
