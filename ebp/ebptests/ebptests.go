@@ -12,6 +12,7 @@ import (
 	"github.com/smartbch/moeingads"
 	"github.com/smartbch/moeingads/store"
 	"github.com/smartbch/moeingads/store/rabbit"
+	"github.com/tendermint/tendermint/libs/log"
 
 	"github.com/smartbch/moeingevm/ebp"
 	tc "github.com/smartbch/moeingevm/evmwrap/testcase"
@@ -96,8 +97,8 @@ func runTestCase(filename string, theCase *tc.TestCase, printLog bool) {
 	trunk = root.GetTrunkStore(1000).(*store.TrunkStore)
 	var chainId big.Int
 	chainId.SetBytes(currBlock.ChainId[:])
-	txEngine := ebp.NewEbpTxExec(10, 100, 32, 100, &tc.DumbSigner{})
-	ctx := types.NewContext(1, nil, nil)
+	txEngine := ebp.NewEbpTxExec(10, 100, 32, 100, &tc.DumbSigner{}, log.NewNopLogger())
+	ctx := types.NewContext(nil, nil)
 	rbt = rabbit.NewRabbitStore(trunk)
 	ctx = ctx.WithRbt(&rbt)
 	txEngine.SetContext(ctx)

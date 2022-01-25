@@ -359,19 +359,29 @@ class tx_control {
 	evmc_tx_context tx_context;
 	evmc_execute_fn execute_fn;
 	bool need_gas_estimation;
+	config cfg;
 public:
 	// this function provides precompile contracts' functionality from Go to C
 	bridge_call_precompiled_contract_fn call_precompiled_contract;
 
 	tx_control(world_state_reader* r, const evmc_tx_context& c, evmc_execute_fn f,
-		bridge_call_precompiled_contract_fn cpc, bool nge):
+		bridge_call_precompiled_contract_fn cpc, bool nge, const config cfg):
 		journal(), cstate(r), world(r), tx_context(c), execute_fn(f),
-		need_gas_estimation(nge), call_precompiled_contract(cpc) {
+		need_gas_estimation(nge), cfg(cfg), call_precompiled_contract(cpc) {
 		journal.reserve(100);
 		if(need_gas_estimation) {
 			gas_trace.reserve(100);
 		}
 	}
+
+	config get_cfg() {
+		return cfg;
+	}
+
+	int64_t get_block_number() {
+		return tx_context.block_number;
+	}
+
 	void gas_trace_append(int64_t gas) {
 		if(need_gas_estimation) gas_trace.push_back(gas);
 	}

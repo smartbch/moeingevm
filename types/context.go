@@ -5,48 +5,76 @@ import (
 	"errors"
 	"math"
 
-	"github.com/holiman/uint256"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/holiman/uint256"
 	"github.com/smartbch/moeingads/store/rabbit"
 	modbtypes "github.com/smartbch/moeingdb/types"
 )
 
 var (
-	ErrAccountNotExist = errors.New("account does not exist")
-	ErrNonceTooSmall   = errors.New("tx nonce is smaller than the account nonce")
-	ErrNonceTooLarge   = errors.New("tx nonce is larger than the account nonce")
-	ErrTooManyEntries  = errors.New("too many candidicate entries to be returned, please limit the difference between startHeight and endHeight")
+	ErrAccountNotExist        = errors.New("account does not exist")
+	ErrNonceTooSmall          = errors.New("tx nonce is smaller than the account nonce")
+	ErrSameNonceAlredyInBlock = errors.New("tx with same nonce already in block")
+	ErrNonceTooLarge          = errors.New("tx nonce is larger than the account nonce")
+	ErrTooManyEntries         = errors.New("too many candidicate entries to be returned, please limit the difference between startHeight and endHeight")
 )
 
 type Context struct {
-	Height uint64
-	Rbt    *rabbit.RabbitStore
-	Db     modbtypes.DB
+	Rbt              *rabbit.RabbitStore
+	Db               modbtypes.DB
+	Height           int64
+	XHedgeForkBlock  int64
+	ShaGateForkBlock int64
 }
 
-func NewContext(height uint64, rbt *rabbit.RabbitStore, db modbtypes.DB) *Context {
+func NewContext(rbt *rabbit.RabbitStore, db modbtypes.DB) *Context {
 	return &Context{
-		Height: height,
-		Rbt:    rbt,
-		Db:     db,
+		Rbt:              rbt,
+		Db:               db,
+		XHedgeForkBlock:  math.MaxInt64,
+		ShaGateForkBlock: math.MaxInt64,
 	}
 }
 
 func (c *Context) WithRbt(rabbitStore *rabbit.RabbitStore) *Context {
 	return &Context{
-		Height: c.Height,
-		Rbt:    rabbitStore,
-		Db:     c.Db,
+		Rbt:              rabbitStore,
+		Db:               c.Db,
+		XHedgeForkBlock:  c.XHedgeForkBlock,
+		ShaGateForkBlock: c.ShaGateForkBlock,
+		Height:           c.Height,
 	}
 }
 
 func (c *Context) WithDb(db modbtypes.DB) *Context {
 	return &Context{
-		Height: c.Height,
-		Rbt:    c.Rbt,
-		Db:     db,
+		Rbt:              c.Rbt,
+		Db:               db,
+		XHedgeForkBlock:  c.XHedgeForkBlock,
+		ShaGateForkBlock: c.ShaGateForkBlock,
+		Height:           c.Height,
 	}
+}
+
+func (c *Context) SetXHedgeForkBlock(xHedgeForkBlock int64) {
+	c.XHedgeForkBlock = xHedgeForkBlock
+}
+
+func (c *Context) SetShaGateForkBlock(shaGateForkBlock int64) {
+	c.ShaGateForkBlock = shaGateForkBlock
+}
+
+func (c *Context) SetCurrentHeight(height int64) {
+	c.Height = height
+}
+
+func (c *Context) IsXHedgeFork() bool {
+	return c.Height >= c.XHedgeForkBlock
+}
+
+func (c *Context) IsShaGateFork() bool {
+	return c.Height >= c.ShaGateForkBlock
 }
 
 //new empty rbt with same parent store as the old one
@@ -57,9 +85,11 @@ func (c *Context) WithRbtCopy() *Context {
 	parent := c.Rbt.GetBaseStore()
 	r := rabbit.NewRabbitStore(parent)
 	return &Context{
-		Height: c.Height,
-		Rbt:    &r,
-		Db:     c.Db,
+		Rbt:              &r,
+		Db:               c.Db,
+		ShaGateForkBlock: c.ShaGateForkBlock,
+		XHedgeForkBlock:  c.XHedgeForkBlock,
+		Height:           c.Height,
 	}
 }
 
@@ -97,9 +127,76 @@ func (c *Context) GetStorageAt(seq uint64, key string) []byte {
 	return c.Rbt.Get(k)
 }
 
+func (c *Context) GetValueAtMapKey(seq uint64, mapSlot string, mapKey string) []byte {
+	key := crypto.Keccak256([]byte(mapKey), []byte(mapSlot))
+	return c.GetStorageAt(seq, string(key))
+}
+
+func (c *Context) SetValueAtMapKey(seq uint64, mapSlot string, mapKey string, val []byte) {
+	key := crypto.Keccak256([]byte(mapKey), []byte(mapSlot))
+	c.SetStorageAt(seq, string(key), val)
+}
+
+func (c *Context) DeleteValueAtMapKey(seq uint64, mapSlot string, mapKey string) {
+	key := crypto.Keccak256([]byte(mapKey), []byte(mapSlot))
+	c.DeleteStorageAt(seq, string(key))
+}
+
+func (c *Context) GetAndDeleteValueAtMapKey(seq uint64, mapSlot string, mapKey string) []byte {
+	key := crypto.Keccak256([]byte(mapKey), []byte(mapSlot))
+	res := c.GetStorageAt(seq, string(key))
+	c.DeleteStorageAt(seq, string(key))
+	return res
+}
+
+func (c *Context) GetDynamicArray(seq uint64, arrSlot string) (res [][]byte) {
+	arrLen := uint256.NewInt(0)
+	arrLenBz := c.GetStorageAt(seq, arrSlot)
+	if len(arrLenBz) == 32 {
+		arrLen.SetBytes32(arrLenBz)
+	}
+	startSlot := uint256.NewInt(0).SetBytes32(crypto.Keccak256([]byte(arrSlot)))
+	endSlot := uint256.NewInt(0).Add(startSlot, arrLen)
+	for startSlot.Lt(endSlot) {
+		res = append(res, c.GetStorageAt(seq, string(startSlot.Bytes())))
+		startSlot.AddUint64(startSlot, 1)
+	}
+	return res
+}
+
+func (c *Context) CreateDynamicArray(seq uint64, arrSlot string, contents [][]byte) {
+	arrLen := uint256.NewInt(uint64(len(contents)))
+	c.SetStorageAt(seq, arrSlot, arrLen.PaddedBytes(32))
+	startSlot := uint256.NewInt(0).SetBytes32(crypto.Keccak256([]byte(arrSlot)))
+	for i, val := range contents {
+		currSlot := uint256.NewInt(0).AddUint64(startSlot, uint64(i))
+		c.SetStorageAt(seq, string(currSlot.PaddedBytes(32)), val)
+	}
+}
+
+func (c *Context) DeleteDynamicArray(seq uint64, arrSlot string) {
+	arrLen := uint256.NewInt(0)
+	arrLenBz := c.GetStorageAt(seq, arrSlot)
+	if len(arrLenBz) == 32 {
+		arrLen.SetBytes32(arrLenBz)
+	}
+	startSlot := uint256.NewInt(0).SetBytes32(crypto.Keccak256([]byte(arrSlot)))
+	endSlot := uint256.NewInt(0).Add(startSlot, arrLen)
+	for startSlot.Lt(endSlot) {
+		c.DeleteStorageAt(seq, string(startSlot.Bytes()))
+		startSlot.AddUint64(startSlot, 1)
+	}
+	c.DeleteStorageAt(seq, arrSlot)
+}
+
 func (c *Context) SetStorageAt(seq uint64, key string, val []byte) {
 	k := GetValueKey(seq, key)
 	c.Rbt.Set(k, val)
+}
+
+func (c *Context) DeleteStorageAt(seq uint64, key string) {
+	k := GetValueKey(seq, key)
+	c.Rbt.Delete(k)
 }
 
 func (c *Context) GetCurrBlockBasicInfo() *Block {
@@ -134,12 +231,13 @@ func (c *Context) GetTxByBlkHtAndTxIndex(height uint64, index uint64) *Transacti
 	return tx
 }
 
-func (c *Context) GetTxByHash(txHash common.Hash) (tx *Transaction, err error) {
+func (c *Context) GetTxByHash(txHash common.Hash) (tx *Transaction, sig [65]byte, err error) {
 	c.Db.GetTxByHash(txHash, func(b []byte) bool {
 		tmp := &Transaction{}
-		_, err := tmp.UnmarshalMsg(b)
+		_, err := tmp.UnmarshalMsg(b[65:])
 		if err == nil && bytes.Equal(tmp.Hash[:], txHash[:]) {
 			tx = tmp
+			copy(sig[:], b[:65])
 			return true // stop retry
 		}
 		return false
@@ -150,12 +248,16 @@ func (c *Context) GetTxByHash(txHash common.Hash) (tx *Transaction, err error) {
 	return
 }
 
-func (c *Context) GetTxSigByHash(txHash common.Hash) [65]byte {
-	return c.Db.GetTxSigByHash(txHash)
-}
-
 func (c *Context) GetBlockHashByHeight(height uint64) [32]byte {
-	return c.Db.GetBlockHashByHeight(int64(height))
+	var zero32 [32]byte
+	res := c.Db.GetBlockHashByHeight(int64(height))
+	if res == zero32 {
+		blk, err := c.GetBlockByHeight(height)
+		if err == nil {
+			return blk.Hash
+		}
+	}
+	return res
 }
 
 func (c *Context) GetBlockByHeight(height uint64) (*Block, error) {
@@ -209,20 +311,20 @@ func (c *Context) CheckNonce(sender common.Address, nonce uint64) (*AccountInfo,
 	return acc, nil
 }
 
-func (c *Context) DeductTxFee(sender common.Address, acc *AccountInfo, txGas uint64, gasPrice *uint256.Int) error {
-	acc.UpdateNonce(acc.Nonce() + 1)
-	var gasFee, gas uint256.Int
-	gas.SetUint64(txGas)
-	gasFee.Mul(&gas, gasPrice)
-	x := acc.Balance()
-	if x.Cmp(&gasFee) < 0 {
-		return errors.New("account balance is not enough for fee")
-	}
-	x.Sub(x, &gasFee)
-	acc.UpdateBalance(x)
-	c.SetAccount(sender, acc)
-	return nil
-}
+//func (c *Context) DeductTxFeeWithSpecificNonce(sender common.Address, acc *AccountInfo, txGas uint64, gasPrice *uint256.Int, newNonce uint64) error {
+//	acc.UpdateNonce(newNonce)
+//	var gasFee, gas uint256.Int
+//	gas.SetUint64(txGas)
+//	gasFee.Mul(&gas, gasPrice)
+//	x := acc.Balance()
+//	if x.Cmp(&gasFee) < 0 {
+//		return errors.New("account balance is not enough for fee")
+//	}
+//	x.Sub(x, &gasFee)
+//	acc.UpdateBalance(x)
+//	c.SetAccount(sender, acc)
+//	return nil
+//}
 
 func isInTopicSlice(topic [32]byte, topics [][32]byte) bool {
 	for _, t := range topics {
@@ -244,7 +346,7 @@ func (c *Context) BasicQueryLogs(address common.Address, topics []common.Hash,
 			return false
 		}
 		tx := Transaction{}
-		if _, err = tx.UnmarshalMsg(data); err != nil {
+		if _, err = tx.UnmarshalMsg(data[65:]); err != nil {
 			return false
 		}
 		for _, log := range tx.Logs {
@@ -283,7 +385,7 @@ func (c *Context) QueryLogs(addresses []common.Address, topics [][]common.Hash, 
 			return false
 		}
 		tx := Transaction{}
-		if _, err = tx.UnmarshalMsg(data); err != nil {
+		if _, err = tx.UnmarshalMsg(data[65:]); err != nil {
 			return false
 		}
 
@@ -302,14 +404,17 @@ func (c *Context) QueryLogs(addresses []common.Address, topics [][]common.Hash, 
 	return
 }
 
-func (c *Context) QueryTxBySrc(addr common.Address, startHeight, endHeight, limit uint32) (txs []*Transaction, err error) {
+func (c *Context) QueryTxBySrc(addr common.Address, startHeight, endHeight, limit uint32) (txs []*Transaction, sigs [][65]byte, err error) {
 	c.Db.QueryTxBySrc(addr, startHeight, endHeight, func(data []byte) bool {
 		if data == nil {
 			err = ErrTooManyEntries
 			return false
 		}
+		var sig [65]byte
+		copy(sig[:], data[:65])
+		sigs = append(sigs, sig)
 		tx := Transaction{}
-		if _, err = tx.UnmarshalMsg(data); err != nil {
+		if _, err = tx.UnmarshalMsg(data[65:]); err != nil {
 			return false
 		}
 		if bytes.Equal(tx.From[:], addr[:]) { // compare them to prevent hash-conflict corner case
@@ -323,14 +428,17 @@ func (c *Context) QueryTxBySrc(addr common.Address, startHeight, endHeight, limi
 	return
 }
 
-func (c *Context) QueryTxByDst(addr common.Address, startHeight, endHeight, limit uint32) (txs []*Transaction, err error) {
+func (c *Context) QueryTxByDst(addr common.Address, startHeight, endHeight, limit uint32) (txs []*Transaction, sigs [][65]byte, err error) {
 	c.Db.QueryTxByDst(addr, startHeight, endHeight, func(data []byte) bool {
 		if data == nil {
 			err = ErrTooManyEntries
 			return false
 		}
+		var sig [65]byte
+		copy(sig[:], data[:65])
+		sigs = append(sigs, sig)
 		tx := Transaction{}
-		if _, err = tx.UnmarshalMsg(data); err != nil {
+		if _, err = tx.UnmarshalMsg(data[65:]); err != nil {
 			return false
 		}
 		if bytes.Equal(tx.To[:], addr[:]) { // compare them to prevent hash-conflict corner case
@@ -344,14 +452,17 @@ func (c *Context) QueryTxByDst(addr common.Address, startHeight, endHeight, limi
 	return
 }
 
-func (c *Context) QueryTxByAddr(addr common.Address, startHeight, endHeight, limit uint32) (txs []*Transaction, err error) {
+func (c *Context) QueryTxByAddr(addr common.Address, startHeight, endHeight, limit uint32) (txs []*Transaction, sigs [][65]byte, err error) {
 	c.Db.QueryTxBySrcOrDst(addr, startHeight, endHeight, func(data []byte) bool {
 		if data == nil {
 			err = ErrTooManyEntries
 			return false
 		}
+		var sig [65]byte
+		copy(sig[:], data[:65])
+		sigs = append(sigs, sig)
 		tx := Transaction{}
-		if _, err = tx.UnmarshalMsg(data); err != nil {
+		if _, err = tx.UnmarshalMsg(data[65:]); err != nil {
 			return false
 		}
 		if bytes.Equal(tx.From[:], addr[:]) || bytes.Equal(tx.To[:], addr[:]) {
@@ -365,21 +476,23 @@ func (c *Context) QueryTxByAddr(addr common.Address, startHeight, endHeight, lim
 	return
 }
 
-func (c *Context) GetTxListByHeight(height uint32) (txs []*Transaction, err error) {
+func (c *Context) GetTxListByHeight(height uint32) (txs []*Transaction, sigs [][65]byte, err error) {
 	return c.GetTxListByHeightWithRange(height, 0, math.MaxInt32)
 }
 
-func (c *Context) GetTxListByHeightWithRange(height uint32, start, end int) (txs []*Transaction, err error) {
+func (c *Context) GetTxListByHeightWithRange(height uint32, start, end int) (txs []*Transaction, sigs [][65]byte, err error) {
 	txContents := c.Db.GetTxListByHeightWithRange(int64(height), start, end)
 	txs = make([]*Transaction, len(txContents))
+	sigs = make([][65]byte, len(txContents))
 	for i, txContent := range txContents {
+		copy(sigs[i][:], txContent[:65])
 		txs[i] = &Transaction{}
-		_, err = txs[i].UnmarshalMsg(txContent)
+		_, err = txs[i].UnmarshalMsg(txContent[65:])
 		if err != nil {
 			break
 		}
 	}
-	return txs, err
+	return
 }
 
 // return the times addr acts as the to-address of a transaction
