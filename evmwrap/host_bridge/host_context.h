@@ -3,8 +3,6 @@
 #include <ethash/keccak.hpp>
 #include "tx_ctrl.h"
 
-const int64_t HARD_FORK_HEIGH_1 = 2801234;
-
 const uint64_t MAX_UINT64 = ~uint64_t(0);
 const uint64_t MAX_CODE_SIZE = 24576; // 24k
 const uint64_t MAX_KEY_SIZE = 256;

@@ -35,6 +35,6 @@ type Frontier interface {
 	SetLatestNonce(addr common.Address, newNonce uint64)
 	GetLatestBalance(addr common.Address) (balance *uint256.Int, exist bool)
 	SetLatestBalance(addr common.Address, balance *uint256.Int)
-	GetLatestTotalGasLimit(addr common.Address) (gasLimit uint64, exist bool)
-	SetLatestTotalGasLimit(addr common.Address, gasLimit uint64)
+	GetLatestTotalGas(addr common.Address) (gas uint64, exist bool)
+	SetLatestTotalGas(addr common.Address, gas uint64)
 }

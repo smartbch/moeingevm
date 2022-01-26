@@ -36,6 +36,10 @@ type (
 	small_buffer             = C.struct_small_buffer
 )
 
+const (
+	EnableRWList = false
+)
+
 var PredefinedContractManager map[common.Address]types.SystemContractExecutor
 
 func RegisterPredefinedContract(ctx *types.Context, address common.Address, executor types.SystemContractExecutor) {
@@ -115,12 +119,15 @@ type TxRunner struct {
 
 	InternalTxCalls   []types.InternalTxCall
 	InternalTxReturns []types.InternalTxReturn
+
+	RwLists *types.ReadWriteLists
 }
 
 func NewTxRunner(ctx *types.Context, tx *types.TxToRun) *TxRunner {
 	return &TxRunner{
-		Ctx: ctx,
-		Tx:  tx,
+		Ctx:     ctx,
+		Tx:      tx,
+		RwLists: &types.ReadWriteLists{},
 	}
 }
 
@@ -165,7 +172,12 @@ func (runner *TxRunner) getCreationCounter(lsb uint8) uint64 {
 	if v == nil {
 		return 0
 	}
-	return binary.BigEndian.Uint64(v)
+	counter := binary.BigEndian.Uint64(v)
+	if EnableRWList {
+		runner.RwLists.CreationCounterRList = append(runner.RwLists.CreationCounterRList,
+			types.CreationCounterRWOp{Lsb: lsb, Counter: counter})
+	}
+	return counter
 }
 
 func (runner *TxRunner) changeCreationCounter(chg_counter *changed_creation_counter) {
@@ -173,10 +185,16 @@ func (runner *TxRunner) changeCreationCounter(chg_counter *changed_creation_coun
 	var buf [8]byte
 	binary.BigEndian.PutUint64(buf[:], uint64(chg_counter.counter))
 	runner.Ctx.Rbt.Set(k, buf[:])
+	if !EnableRWList {
+		return
+	}
+	runner.RwLists.CreationCounterWList = append(runner.RwLists.CreationCounterWList,
+		types.CreationCounterRWOp{Lsb: uint8(chg_counter.lsb), Counter: uint64(chg_counter.counter)})
 }
 
 func (runner *TxRunner) getAccountInfo(addr_ptr *evmc_address, balance *evmc_bytes32, nonce *C.uint64_t, sequence *C.uint64_t) {
-	acc := runner.Ctx.GetAccount(toAddress(addr_ptr))
+	addr := toAddress(addr_ptr)
+	acc := runner.Ctx.GetAccount(addr)
 	if acc == nil {
 		*nonce = ^C.uint64_t(0) // nonce with all ones means a non-existant account
 		return
@@ -184,24 +202,39 @@ func (runner *TxRunner) getAccountInfo(addr_ptr *evmc_address, balance *evmc_byt
 	writeCBytes32WithSlice(balance, acc.BalanceSlice())
 	*nonce = C.uint64_t(binary.BigEndian.Uint64(acc.NonceSlice()))
 	*sequence = C.uint64_t(binary.BigEndian.Uint64(acc.SequenceSlice()))
+	if !EnableRWList {
+		return
+	}
+	op := types.AccountRWOp{Account: acc.Bytes(), Addr: addr}
+	runner.RwLists.AccountRList = append(runner.RwLists.AccountRList, op)
 }
 
 func (runner *TxRunner) changeAccount(chg_acc *changed_account) {
 	addr := toAddress(chg_acc.address)
 	k := types.GetAccountKey(addr)
+	acc := &types.AccountInfo{}
 	if chg_acc.delete_me {
 		runner.Ctx.Rbt.Delete(k)
 	} else {
-		acc := types.ZeroAccountInfo()
+		acc = types.ZeroAccountInfo()
 		binary.BigEndian.PutUint64(acc.NonceSlice(), uint64(chg_acc.nonce))
 		binary.BigEndian.PutUint64(acc.SequenceSlice(), uint64(chg_acc.sequence))
 		writeSliceWithCBytes32(acc.BalanceSlice(), &chg_acc.balance)
 		runner.Ctx.Rbt.Set(k, acc.Bytes())
 	}
+	if !EnableRWList {
+		return
+	}
+	if addr == runner.Tx.From {
+		return // We cannot get correct data here without refund
+	}
+	op := types.AccountRWOp{Account: acc.Bytes(), Addr: addr}
+	runner.RwLists.AccountWList = append(runner.RwLists.AccountWList, op)
 }
 
 func (runner *TxRunner) getBytecode(addr_ptr *evmc_address, codehash_ptr *evmc_bytes32, buf *big_buffer, size *C.size_t) {
-	bi := runner.Ctx.GetCode(toAddress(addr_ptr))
+	addr := toAddress(addr_ptr)
+	bi := runner.Ctx.GetCode(addr)
 	if bi == nil {
 		*size = C.size_t(0)
 		return
@@ -212,43 +245,75 @@ func (runner *TxRunner) getBytecode(addr_ptr *evmc_address, codehash_ptr *evmc_b
 		buf.data[i] = C.uint8_t(bs[i])
 	}
 	writeCBytes32WithSlice(codehash_ptr, bi.CodeHashSlice())
+	if !EnableRWList {
+		return
+	}
+	op := types.BytecodeRWOp{Bytecode: bi.Bytes(), Addr: addr}
+	runner.RwLists.BytecodeRList = append(runner.RwLists.BytecodeRList, op)
 }
 
 func (runner *TxRunner) changeBytecode(chg_bytecode *changed_bytecode) {
 	addr := toAddress(chg_bytecode.address)
 	k := types.GetBytecodeKey(addr)
+	var bz []byte
 	if chg_bytecode.bytecode_size == 0 {
 		runner.Ctx.Rbt.Delete(k)
 	} else {
-		bz := make([]byte, 33, 33+chg_bytecode.bytecode_size)
+		bz = make([]byte, 33, 33+chg_bytecode.bytecode_size)
 		bz[0] = 0 // version byte is zero
 		writeSliceWithCBytes32(bz[1:33], chg_bytecode.codehash)
 		bz = append(bz, C.GoStringN(chg_bytecode.bytecode_data, chg_bytecode.bytecode_size)...)
 		runner.Ctx.Rbt.Set(k, bz)
 	}
+	if !EnableRWList {
+		return
+	}
+	op := types.BytecodeRWOp{Bytecode: bz, Addr: addr}
+	runner.RwLists.BytecodeWList = append(runner.RwLists.BytecodeWList, op)
 }
 
 func (runner *TxRunner) getValue(acc_seq C.uint64_t, key_ptr *C.char, buf *big_buffer, size *C.size_t) {
-	bs := runner.Ctx.GetStorageAt(uint64(acc_seq), C.GoStringN(key_ptr, 32))
+	seq := uint64(acc_seq)
+	key := C.GoStringN(key_ptr, 32)
+	bs := runner.Ctx.GetStorageAt(seq, key)
 	*size = C.size_t(len(bs))
 	for i := range bs {
 		buf.data[i] = C.uint8_t(bs[i])
 	}
+	if !EnableRWList {
+		return
+	}
+	op := types.StorageRWOp{Seq: seq, Key: key, Value: bs}
+	runner.RwLists.StorageRList = append(runner.RwLists.StorageRList, op)
 }
 
 func (runner *TxRunner) changeValue(chg_value *changed_value) {
-	k := types.GetValueKey(uint64(chg_value.account_seq), C.GoStringN(chg_value.key_ptr, 32))
+	seq := uint64(chg_value.account_seq)
+	key := C.GoStringN(chg_value.key_ptr, 32)
+	k := types.GetValueKey(seq, key)
+	var bz []byte
 	if chg_value.value_size == 0 {
 		runner.Ctx.Rbt.Delete(k)
 	} else {
-		runner.Ctx.Rbt.Set(k, C.GoBytes(unsafe.Pointer(chg_value.value_data), chg_value.value_size))
+		bz = C.GoBytes(unsafe.Pointer(chg_value.value_data), chg_value.value_size)
+		runner.Ctx.Rbt.Set(k, bz)
 	}
+	if !EnableRWList {
+		return
+	}
+	op := types.StorageRWOp{Seq: seq, Key: key, Value: bz}
+	runner.RwLists.StorageWList = append(runner.RwLists.StorageWList, op)
 }
 
 //hash => height; height => block in db
 func (runner *TxRunner) getBlockHash(num C.uint64_t) (result evmc_bytes32) {
 	hash := runner.Ctx.GetBlockHashByHeight(uint64(num))
 	writeCBytes32WithSlice(&result, hash[:])
+	if !EnableRWList {
+		return
+	}
+	op := types.BlockHashOp{Height: uint64(num), Hash: hash}
+	runner.RwLists.BlockHashList = append(runner.RwLists.BlockHashList, op)
 	return
 }
 
@@ -284,7 +349,13 @@ func (runner *TxRunner) refundGasFee(ret_value *evmc_result, refund C.uint64_t) 
 	runner.Ctx.Rbt.Set(k, acc.Bytes())
 	runner.FeeRefund = returnedGasFee
 	runner.GasUsed = gasUsed
+	if !EnableRWList {
+		return
+	}
+	op := types.AccountRWOp{Account: acc.Bytes(), Addr: runner.Tx.From}
+	runner.RwLists.AccountWList = append(runner.RwLists.AccountWList, op)
 }
+
 func (runner *TxRunner) GetGasFee() *uint256.Int {
 	return uint256.NewInt(0).Mul(uint256.NewInt(runner.GasUsed),
 		uint256.NewInt(0).SetBytes(runner.Tx.GasPrice[:]))
@@ -428,6 +499,7 @@ func runTx(idx int, currBlock *types.BlockInfo) {
 }
 
 func RunTxForRpc(currBlock *types.BlockInfo, estimateGas bool, runner *TxRunner) int64 {
+	fmt.Printf("RunTxForRpc height %d\n", currBlock.Number)
 	idx := getFreeRpcRunnerAndLockIt()
 	RpcRunners[idx] = runner
 	defer func() {
@@ -476,6 +548,7 @@ func runTxHelper(idx int, currBlock *types.BlockInfo, estimateGas bool) int64 {
 	bi.number = C.int64_t(currBlock.Number)
 	bi.timestamp = C.int64_t(currBlock.Timestamp)
 	bi.gas_limit = C.int64_t(currBlock.GasLimit)
+	bi.cfg.after_xhedge_fork = C.bool(runner.Ctx.IsXHedgeFork())
 	writeCBytes32WithSlice(&bi.difficulty, currBlock.Difficulty[:])
 	writeCBytes32WithSlice(&bi.chain_id, currBlock.ChainId[:])
 	data_ptr := (*C.uint8_t)(nil)
