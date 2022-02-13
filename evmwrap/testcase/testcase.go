@@ -408,10 +408,19 @@ func atoi(s string) uint64 {
 	return uint64(n)
 }
 
+func ReadTestCasesFromString(str string) (result []TestCase) {
+	return readTestCases(strings.NewReader(str))
+}
+
 func ReadTestCases(filename string) (result []TestCase) {
 	infile, _ := os.Open(filename)
 	defer infile.Close()
+	result = readTestCases(infile)
+	checkTestCases(filename, result)
+	return
+}
 
+func readTestCases(infile io.Reader) (result []TestCase) {
 	var currCase *TestCase
 	var currState *WorldState
 	var currBlock *TestBlock
@@ -503,7 +512,6 @@ func ReadTestCases(filename string) (result []TestCase) {
 	if err := scanner.Err(); err != nil {
 		fmt.Fprintln(os.Stderr, "reading input:", err)
 	}
-	checkTestCases(filename, result)
 	return
 }
 
