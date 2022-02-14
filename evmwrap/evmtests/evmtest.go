@@ -226,7 +226,7 @@ func (collector *ResultCollector) deductGasFee() {
 
 func (collector *ResultCollector) refundGasFee(ret_value *evmc_result, refund C.uint64_t) {
 	gasUsed := collector.currTx.Gas - uint64(ret_value.gas_left)
-	fmt.Printf("@GAS gas_left %d currTx.Gas %d gasUsed %d\n", uint64(ret_value.gas_left), collector.currTx.Gas, gasUsed)
+	//fmt.Printf("@GAS gas_left %d currTx.Gas %d gasUsed %d\n", uint64(ret_value.gas_left), collector.currTx.Gas, gasUsed)
 	collector.gasLeft = uint64(ret_value.gas_left)
 	half := (gasUsed + 1) / 2
 	if uint64(refund) > half {
