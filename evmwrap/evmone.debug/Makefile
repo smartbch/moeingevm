@@ -11,7 +11,7 @@ OBJS = \
 all : ${OBJS}
 
 %.o : %.cpp
-	g++ -O3 -fPIC -std=c++17 -c -I ./include -I ../evmc/include/ -I ../intx/include/ -I ../keccak/include -o $@ -c $<
+	g++ -O3 -static -std=c++17 -c -I ./include -I ../evmc/include/ -I ../intx/include/ -I ../keccak/include -o $@ -c $<
 
 clean:
 	rm *.o
