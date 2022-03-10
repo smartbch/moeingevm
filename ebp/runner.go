@@ -14,8 +14,19 @@ import (
 	"github.com/smartbch/moeingevm/utils"
 )
 
-//#cgo LDFLAGS: -ldl
-//#include "bridge.h"
+
+//#include "../evmwrap/host_bridge/bridge.h"
+//int64_t zero_depth_call_wrap(evmc_bytes32 gas_price,
+//                             int64_t gas_limit,
+//                             const evmc_address* destination,
+//                             const evmc_address* sender,
+//                             const evmc_bytes32* value,
+//                             const uint8_t* input_data,
+//                             size_t input_size,
+//                             const struct block_info* block,
+//                             int collector_handler,
+//                             bool need_gas_estimation,
+//                             enum evmc_revision revision);
 import "C"
 
 type (

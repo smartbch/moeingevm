@@ -11,6 +11,7 @@ import (
 )
 
 //#include <stdint.h>
+//#include "../evmwrap/host_bridge/bridge.h"
 import "C"
 
 //var PrecompiledContractsIstanbul map[common.Address]PrecompiledContract
