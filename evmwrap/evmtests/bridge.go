@@ -1,7 +1,7 @@
 package main
 
 /*
-#cgo LDFLAGS: -levmwrap -L../host_bridge -lstdc++
+#cgo LDFLAGS: -l:libevmwrap.a -L../host_bridge -lstdc++
 #include "../host_bridge/bridge.h"
 
 extern uint64_t get_creation_counter(int handler, uint8_t);

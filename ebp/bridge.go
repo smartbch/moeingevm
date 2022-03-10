@@ -1,6 +1,6 @@
 package ebp
 
-//#cgo LDFLAGS: -levmwrap -L../evmwrap/host_bridge -lstdc++
+//#cgo LDFLAGS: -l:libevmwrap.a -L../evmwrap/host_bridge -lstdc++
 //#include "../evmwrap/host_bridge/bridge.h"
 //#include <dlfcn.h>
 //#include <stdlib.h>
