@@ -510,7 +510,7 @@ func runTx(idx int, currBlock *types.BlockInfo) {
 }
 
 func RunTxForRpc(currBlock *types.BlockInfo, estimateGas bool, runner *TxRunner) int64 {
-	fmt.Printf("RunTxForRpc height %d\n", currBlock.Number)
+	//fmt.Printf("RunTxForRpc height %d\n", currBlock.Number)
 	idx := getFreeRpcRunnerAndLockIt()
 	RpcRunners[idx] = runner
 	defer func() {
