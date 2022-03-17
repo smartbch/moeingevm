@@ -1,6 +1,6 @@
 module github.com/smartbch/moeingevm
 
-go 1.17
+go 1.18
 
 require (
 	github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46 // indirect
