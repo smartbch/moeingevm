@@ -16,7 +16,8 @@ import (
 )
 
 /*
-#cgo LDFLAGS: -levmwrap -L.
+#cgo linux LDFLAGS: -l:libevmwrap.a -L../host_bridge -lstdc++
+#cgo darwin LDFLAGS: -levmwrap -L../host_bridge -lstdc++
 #include "../host_bridge/bridge.h"
 int64_t zero_depth_call_wrap(evmc_bytes32 gas_price,
                      int64_t gas_limit,
