@@ -13,7 +13,7 @@ jobs:
   test:
     strategy:
       matrix:
-        go-version: [1.18.x]
+        go: [1.18.x]
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
@@ -37,6 +37,11 @@ jobs:
           tar zxvf v5.18.4.tar.gz
           cd rocksdb-5.18.4
           make CC=gcc-8 CXX=g++-8 static_lib
+
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
 
       - uses: actions/cache@v2
         with:
@@ -71,5 +76,5 @@ jobs:
           cd moeingevm
           go build -tags cppbtree ./...
           go test -tags cppbtree ./...
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.44.2
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.45.2
           /home/runner/go/bin/golangci-lint run
