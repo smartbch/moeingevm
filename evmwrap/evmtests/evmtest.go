@@ -435,7 +435,10 @@ func runTestCaseWithGasLimit(filename string, theCase *tc.TestCase, printLog boo
 		}
 	} else if mode == PRINT_POST_STATE {
 		var addr [20]byte
-		hex.Decode(addr[:], []byte("6295ee1b4f6dd65047762f924ecd367c17eabf8f"))
+		_, err := hex.Decode(addr[:], []byte("6295ee1b4f6dd65047762f924ecd367c17eabf8f"))
+		if err != nil {
+			panic(err)
+		}
 		fmt.Println(hex.EncodeToString(theCase.ImplState.Bytecodes[addr].Bytecode))
 	} else {
 		foutRef, _ := os.Create("ref.txt")
