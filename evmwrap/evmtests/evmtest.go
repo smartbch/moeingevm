@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
+	"encoding/hex"
 	"io"
 	"os"
 	"os/exec"
@@ -225,7 +227,7 @@ func (collector *ResultCollector) deductGasFee() {
 
 func (collector *ResultCollector) refundGasFee(ret_value *evmc_result, refund C.uint64_t) {
 	gasUsed := collector.currTx.Gas - uint64(ret_value.gas_left)
-	fmt.Printf("@GAS gas_left %d currTx.Gas %d gasUsed %d\n", uint64(ret_value.gas_left), collector.currTx.Gas, gasUsed)
+	//fmt.Printf("@GAS gas_left %d currTx.Gas %d gasUsed %d\n", uint64(ret_value.gas_left), collector.currTx.Gas, gasUsed)
 	collector.gasLeft = uint64(ret_value.gas_left)
 	half := (gasUsed + 1) / 2
 	if uint64(refund) > half {
@@ -342,14 +344,10 @@ func collect_result(handler C.int /*not used*/, result *all_changed, ret_value *
 // ============================================================
 
 const (
-	//NORMAL       = 0
-	ESTIMATE_GAS = 1
-	CHECK_GAS    = 2
+	ESTIMATE_GAS     = 1
+	CHECK_GAS        = 2
+	PRINT_POST_STATE = 3
 )
-
-//func runTestCase(filename string, theCase *tc.TestCase, printLog bool) {
-//	runTestCaseWithGasLimit(filename, theCase, printLog, -1, 0)
-//}
 
 func runTestCaseDual(filename string, theCase *tc.TestCase, printLog bool) {
 	copiedCase := &tc.TestCase{
@@ -430,20 +428,24 @@ func runTestCaseWithGasLimit(filename string, theCase *tc.TestCase, printLog boo
 	blockReward.SetUint64(2000000000000000000)
 	tc.AddBlockReward(WORLD, currBlock.Coinbase, &blockReward)
 
-	foutRef, _ := os.Create("ref.txt")
-	tc.PrintWorldState(foutRef, &theCase.RefState)
-	foutRef.Close()
-
-	foutImp, _ := os.Create("imp.txt")
-	tc.PrintWorldState(foutImp, &theCase.ImplState)
-	foutImp.Close()
-
 	if mode == CHECK_GAS {
 		//fmt.Printf("WE_ESTIMATE %d LEFT %d %s %s\n", gasLimit, COLLECTOR.gasLeft, filename, theCase.Name)
 		if !COLLECTOR.succeed {
 			panic("status_code != EVMC_SUCCESS")
 		}
+	} else if mode == PRINT_POST_STATE {
+		var addr [20]byte
+		hex.Decode(addr[:], []byte("6295ee1b4f6dd65047762f924ecd367c17eabf8f"))
+		fmt.Println(hex.EncodeToString(theCase.ImplState.Bytecodes[addr].Bytecode))
 	} else {
+		foutRef, _ := os.Create("ref.txt")
+		tc.PrintWorldState(foutRef, &theCase.RefState)
+		foutRef.Close()
+
+		foutImp, _ := os.Create("imp.txt")
+		tc.PrintWorldState(foutImp, &theCase.ImplState)
+		foutImp.Close()
+
 		cmd := exec.Command("diff", "ref.txt", "imp.txt")
 		err := cmd.Run()
 		if err != nil {
@@ -458,6 +460,43 @@ func runTestCaseWithGasLimit(filename string, theCase *tc.TestCase, printLog boo
 	return int64(estimatedGas)
 }
 
+const deployCodeTestCase = `test deployCodeTestCase
+pre
+ addr 0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b
+  acc_nonce 0
+  balance 1000000000000
+  code 0
+blocks
+ block 0
+  coinbase 0x2adc25665018aa1fe0e6bc666dac8fc2697ff9ba
+  height 1
+  difficulty 131072
+  gaslimit 20019530
+  timestamp 1000
+  tx 0
+   from 0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b
+   nonce 0
+   to 0x0000000000000000000000000000000000000000
+   value 0
+   gasprice 1
+   gas 15000000
+   data 0
+`
+
+func getDeployedCode() {
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Scan()
+	bytecodeHex := scanner.Text()
+	data, err := hex.DecodeString(bytecodeHex)
+	if err != nil {
+		panic(err)
+	}
+	cases := tc.ReadTestCasesFromString(deployCodeTestCase)
+	theCase := &cases[0]
+	theCase.Blocks[0].TxList[0].Data = data
+	runTestCaseWithGasLimit("", theCase, false, 9000*10000, PRINT_POST_STATE)
+}
+
 func main() {
 	args := os.Args
 	me := args[0]
@@ -468,8 +507,10 @@ func main() {
 		tc.RunOneFile(args, fn)
 	} else if strings.HasSuffix(me, "run_test_dir") {
 		tc.RunOneDir(args, true, fn)
+	} else if strings.HasSuffix(me, "deploycode") {
+		getDeployedCode()
 	} else {
 		fmt.Printf("NOT RUN \n")
 	}
-	//return
+	os.Exit(0)
 }
