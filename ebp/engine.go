@@ -51,6 +51,9 @@ type txEngine struct {
 	cumulativeFeeRefund *uint256.Int
 	cumulativeGasFee    *uint256.Int
 
+	aotDir            string
+	aotReloadInterval int64
+
 	logger log.Logger
 }
 
@@ -164,6 +167,11 @@ func NewEbpTxExec(exeRoundCount, runnerNumber, parallelNum, defaultTxListCap int
 		signer:       s,
 		logger:       logger,
 	}
+}
+
+func (exec *txEngine) SetAotParam(aotDir string, aotReloadInterval int64) {
+	exec.aotDir = aotDir
+	exec.aotReloadInterval = aotReloadInterval
 }
 
 // A new context must be set before Execute
@@ -452,6 +460,7 @@ func (exec *txEngine) Execute(currBlock *types.BlockInfo) {
 	}
 	exec.setStandbyQueueRange(txRange.start, txRange.end)
 	exec.collectCommittableTxs(committableRunnerList)
+	exec.reloadQueryExecutorFn()
 }
 
 // Get the start and end position of standby queue
@@ -653,6 +662,13 @@ func (exec *txEngine) collectCommittableTxs(committableRunnerList []*TxRunner) {
 		tx.LogsBloom = LogsBloom(tx.Logs)
 		exec.committedTxs = append(exec.committedTxs, tx)
 	}
+}
+
+func (exec *txEngine) reloadQueryExecutorFn() {
+	if exec.currentBlock.Number % exec.aotReloadInterval != 0 {
+		return
+	}
+	ReloadQueryExecutorFn(exec.aotDir)
 }
 
 func LogsBloom(logs []types.Log) [256]byte {

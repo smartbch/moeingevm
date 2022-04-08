@@ -30,7 +30,9 @@ int64_t zero_depth_call_wrap(evmc_bytes32 gas_price,
                      size_t input_size,
 		     const struct block_info* block,
 		     int handler,
-		     bool need_gas_estimation);
+		     bool need_gas_estimation,
+                     enum evmc_revision revision,
+		     bridge_query_executor_fn query_executor_fn);
 */
 import "C"
 
@@ -423,7 +425,9 @@ func runTestCaseWithGasLimit(filename string, theCase *tc.TestCase, printLog boo
 		C.size_t(len(currTx.Data)),
 		&bi,
 		0,
-		C.bool(mode == ESTIMATE_GAS))
+		C.bool(mode == ESTIMATE_GAS),
+		C.EVMC_ISTANBUL,
+		nil)
 
 	blockReward.SetUint64(2000000000000000000)
 	tc.AddBlockReward(WORLD, currBlock.Coinbase, &blockReward)

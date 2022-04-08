@@ -26,7 +26,8 @@ import (
 //                             const struct block_info* block,
 //                             int collector_handler,
 //                             bool need_gas_estimation,
-//                             enum evmc_revision revision);
+//                             enum evmc_revision revision,
+//                             bridge_query_executor_fn query_executor_fn);
 import "C"
 
 type (
@@ -585,7 +586,8 @@ func runTxHelper(idx int, currBlock *types.BlockInfo, estimateGas bool) int64 {
 		&bi,
 		C.int(idx),
 		C.bool(estimateGas),
-		C.EVMC_ISTANBUL)
+		C.EVMC_ISTANBUL,
+		QueryExecutorFn)
 	return int64(gasEstimated)
 }
 
