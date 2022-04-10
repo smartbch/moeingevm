@@ -351,6 +351,25 @@ const (
 	PRINT_POST_STATE = 3
 )
 
+func updateQueryExecutorFn(addr [20]byte, info tc.BytecodeInfo) {
+	aotDir := os.Getenv("AOTDIR")
+	if len(aotDir) == 0 || len(info.Bytecode) == 0 {
+		return
+	}
+	addrHex := hex.EncodeToString(addr[:])
+	bytecodeHex := hex.EncodeToString(info.Bytecode[33:])
+	cmd := exec.Command("aotscript", addrHex, bytecodeHex)
+	libFile, err := cmd.Output()
+	if err != nil {
+		panic(err)
+	}
+	ReloadQueryExecutorFn(string(libFile))
+}
+
+func runTestCaseSingle(filename string, theCase *tc.TestCase, printLog bool) {
+	runTestCaseWithGasLimit(filename, theCase, printLog, -1, ESTIMATE_GAS)
+}
+
 func runTestCaseDual(filename string, theCase *tc.TestCase, printLog bool) {
 	copiedCase := &tc.TestCase{
 		Name:      theCase.Name,
@@ -358,12 +377,12 @@ func runTestCaseDual(filename string, theCase *tc.TestCase, printLog bool) {
 		RefState:  theCase.RefState.Clone(),
 		Blocks:    theCase.Blocks,
 	}
-	estimatedGas := runTestCaseWithGasLimit(filename, theCase, printLog, -1, 1)
+	estimatedGas := runTestCaseWithGasLimit(filename, theCase, printLog, -1, ESTIMATE_GAS)
 	fmt.Printf("estimatedGas %d\n", estimatedGas)
 	if estimatedGas < 0 {
 		panic("Error during estimation")
 	} else if estimatedGas > 0 {
-		runTestCaseWithGasLimit(filename, copiedCase, printLog, estimatedGas, 2)
+		runTestCaseWithGasLimit(filename, copiedCase, printLog, estimatedGas, CHECK_GAS)
 	}
 }
 
@@ -416,6 +435,9 @@ func runTestCaseWithGasLimit(filename string, theCase *tc.TestCase, printLog boo
 	if len(currTx.Data) != 0 {
 		data_ptr = (*C.uint8_t)(unsafe.Pointer(&currTx.Data[0]))
 	}
+
+	updateQueryExecutorFn(currTx.To, WORLD.Bytecodes[currTx.To])
+
 	estimatedGas := C.zero_depth_call_wrap(gas_price,
 		C.int64_t(currTx.Gas),
 		&to,
@@ -427,7 +449,7 @@ func runTestCaseWithGasLimit(filename string, theCase *tc.TestCase, printLog boo
 		0,
 		C.bool(mode == ESTIMATE_GAS),
 		C.EVMC_ISTANBUL,
-		nil)
+		QueryExecutorFn)
 
 	blockReward.SetUint64(2000000000000000000)
 	tc.AddBlockReward(WORLD, currBlock.Coinbase, &blockReward)
@@ -507,7 +529,7 @@ func getDeployedCode() {
 func main() {
 	args := os.Args
 	me := args[0]
-	fn := runTestCaseDual
+	fn := runTestCaseSingle // runTestCaseSingle or runTestCaseDual
 	if strings.HasSuffix(me, "run_test_case") {
 		tc.RunOneCase(args, true, fn)
 	} else if strings.HasSuffix(me, "run_test_file") {
