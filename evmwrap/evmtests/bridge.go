@@ -5,6 +5,7 @@ package main
 #cgo darwin LDFLAGS: -levmwrap -L../host_bridge -lstdc++ -ldl
 #include <dlfcn.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include "../host_bridge/bridge.h"
 
 enum dl_init_status {
@@ -89,6 +90,7 @@ bridge_query_executor_fn load_func_from_dl(_GoString_ path, int* status) {
         }
         
         bridge_query_executor_fn f = (bridge_query_executor_fn)dlsym(lib_handle, "query_executor");
+	printf("bridge_query_executor_fn %08lx\n", (size_t)f);
         char* errorInfo = dlerror();
         if (errorInfo != NULL) {
                 *status = SYMBOL_NOT_FOUND;
@@ -103,6 +105,7 @@ import "C"
 import (
 	"os"
 	"path"
+	"strings"
 )
 
 var (
@@ -116,11 +119,18 @@ func ReloadQueryExecutorFn(aotDir string) {
 		panic(err)
 	}
 
-	if len(files) == 0 {
+	libFiles := make([]string, 0, len(files))
+	for _, entry := range files {
+		if strings.HasPrefix(entry.Name(), "lib") {
+			libFiles = append(libFiles, entry.Name())
+		}
+	}
+
+	if len(libFiles) == 0 {
 		return
 	}
 
-	libFile := path.Join(aotDir, files[len(files)-1].Name())
+	libFile := path.Join(aotDir, libFiles[len(libFiles)-1])
 	if libFile == lastFile {
 		return
 	}
@@ -128,6 +138,7 @@ func ReloadQueryExecutorFn(aotDir string) {
 
 	var status C.int
 	QueryExecutorFn = C.load_func_from_dl(libFile+"\x00", &status)
+	//fmt.Printf("QueryExecutorFn %#v\n", QueryExecutorFn)
 	if status != 0 {
 		panic("Failed to load dynamic library")
 	}

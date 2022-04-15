@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"encoding/hex"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
 	"unsafe"
 
@@ -357,16 +359,46 @@ func updateQueryExecutorFn(addr [20]byte, info tc.BytecodeInfo) {
 		return
 	}
 	addrHex := hex.EncodeToString(addr[:])
-	bytecodeHex := hex.EncodeToString(info.Bytecode[33:])
-	cmd := exec.Command("aotscript", addrHex, bytecodeHex)
-	libFile, err := cmd.Output()
+	bytecodeHex := hex.EncodeToString(info.Bytecode[:])
+	if err := os.RemoveAll(path.Join(aotDir, "in")); err != nil {
+		panic(err)
+	}
+	if err := os.RemoveAll(path.Join(aotDir, "out")); err != nil {
+		panic(err)
+	}
+	if err := os.Mkdir(path.Join(aotDir, "in"), 0750); err != nil {
+		panic(err)
+	}
+	if err := os.Mkdir(path.Join(aotDir, "out"), 0750); err != nil {
+		panic(err)
+	}
+	if err := ioutil.WriteFile(path.Join(aotDir, "in", addrHex), []byte(bytecodeHex), 0644); err != nil {
+		panic(err)
+	}
+
+	cmd := exec.Command("runaot", "gen", path.Join(aotDir, "in"), path.Join(aotDir, "out"))
+	output, err := cmd.Output()
 	if err != nil {
 		panic(err)
 	}
-	ReloadQueryExecutorFn(string(libFile))
+	fmt.Printf("runaot output\n%s\n", string(output))
+
+	cmd = exec.Command("bash", "compile.sh")
+	cmd.Dir = path.Join(aotDir, "out")
+	output, err = cmd.Output()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("compile output\n%s\n", string(output))
+
+	if err != nil {
+		panic(err)
+	}
+	ReloadQueryExecutorFn(path.Join(aotDir, "out"))
 }
 
 func runTestCaseSingle(filename string, theCase *tc.TestCase, printLog bool) {
+	//ReloadQueryExecutorFn(path.Join(os.Getenv("AOTDIR"), "out"))
 	runTestCaseWithGasLimit(filename, theCase, printLog, -1, ESTIMATE_GAS)
 }
 
@@ -479,7 +511,7 @@ func runTestCaseWithGasLimit(filename string, theCase *tc.TestCase, printLog boo
 		err := cmd.Run()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "FAIL!! Compare %s %s\n", filename, theCase.Name)
-			panic("FAIL")
+			//panic("FAIL")
 		} else {
 			fmt.Fprintf(os.Stderr, "PASS!! Compare %s %s\n", filename, theCase.Name)
 		}

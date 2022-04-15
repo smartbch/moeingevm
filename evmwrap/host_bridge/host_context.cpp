@@ -190,7 +190,7 @@ bytes rlp_encode(const std::vector<bytes>& input_vec) {
 bytes rlp_encode_address(const evmc_address& addr) {
 	bytes result;
 	result.reserve(20);
-	for(int i=0; i < sizeof(evmc_address); i++) {
+	for(size_t i=0; i < sizeof(evmc_address); i++) {
 		result.append(1, char(addr.bytes[i]));
 	}
 	return result;
@@ -610,6 +610,12 @@ int64_t intrinsic_gas(const uint8_t* input_data, size_t input_size, bool is_cont
 	return gas;
 }
 
+__inline__ uint64_t rdtsc() {
+  uint64_t a, d;
+  __asm__ volatile ("rdtsc" : "=a" (a), "=d" (d));
+  return (d<<32) | a;
+}
+
 int64_t zero_depth_call(evmc_uint256be gas_price,
                      int64_t gas_limit,
                      const evmc_address* destination,
@@ -679,10 +685,11 @@ int64_t zero_depth_call(evmc_uint256be gas_price,
 		.value = *value
 	};
 	evmc_vm* vm = nullptr;
-	evmc_execute_fn executor;
+	evmc_execute_fn executor = nullptr;
 	if(query_executor_fn) { // Check AOT
 		executor = query_executor_fn(destination);
-	} else {
+	}
+	if(!executor) {
 		vm = evmc_create_evmone();
 		executor = vm->execute;
 	}
@@ -697,7 +704,10 @@ int64_t zero_depth_call(evmc_uint256be gas_price,
 		if(vm) vm->destroy(vm);
 		return 0;
 	}
+	//uint64_t t = rdtsc();
 	evmc_result result = ctx.call(msg);
+	//t = rdtsc() - t;
+	//std::cout<<"Time used: "<<t<<std::endl;
 	txctrl.collect_result(collect_result_fn, handler, &result);
 	int64_t gas_estimated = 0;
 	if(need_gas_estimation) {
