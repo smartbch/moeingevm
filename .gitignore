@@ -24,3 +24,6 @@ evmwrap/evmtests/evmtests
 evmwrap/evmtests/run_test_file
 ebp/testdbdata/
 ebp/ebptests/rocksdb.db/
+evmwrap/evmtests/AOTDIR
+evmwrap/evmtests/deploycode
+evmwrap/cachetest/cachetest
