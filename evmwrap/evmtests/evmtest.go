@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"encoding/hex"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
 	"unsafe"
 
@@ -30,7 +32,9 @@ int64_t zero_depth_call_wrap(evmc_bytes32 gas_price,
                      size_t input_size,
 		     const struct block_info* block,
 		     int handler,
-		     bool need_gas_estimation);
+		     bool need_gas_estimation,
+                     enum evmc_revision revision,
+		     bridge_query_executor_fn query_executor_fn);
 */
 import "C"
 
@@ -349,6 +353,55 @@ const (
 	PRINT_POST_STATE = 3
 )
 
+func updateQueryExecutorFn(addr [20]byte, info tc.BytecodeInfo) {
+	aotDir := os.Getenv("AOTDIR")
+	if len(aotDir) == 0 || len(info.Bytecode) == 0 {
+		return
+	}
+	addrHex := hex.EncodeToString(addr[:])
+	bytecodeHex := hex.EncodeToString(info.Bytecode[:])
+	if err := os.RemoveAll(path.Join(aotDir, "in")); err != nil {
+		panic(err)
+	}
+	if err := os.RemoveAll(path.Join(aotDir, "out")); err != nil {
+		panic(err)
+	}
+	if err := os.Mkdir(path.Join(aotDir, "in"), 0750); err != nil {
+		panic(err)
+	}
+	if err := os.Mkdir(path.Join(aotDir, "out"), 0750); err != nil {
+		panic(err)
+	}
+	if err := ioutil.WriteFile(path.Join(aotDir, "in", addrHex), []byte(bytecodeHex), 0644); err != nil {
+		panic(err)
+	}
+
+	cmd := exec.Command("runaot", "gen", path.Join(aotDir, "in"), path.Join(aotDir, "out"))
+	output, err := cmd.Output()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("runaot output\n%s\n", string(output))
+
+	cmd = exec.Command("bash", "compile.sh")
+	cmd.Dir = path.Join(aotDir, "out")
+	output, err = cmd.Output()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("compile output\n%s\n", string(output))
+
+	if err != nil {
+		panic(err)
+	}
+	ReloadQueryExecutorFn(path.Join(aotDir, "out"))
+}
+
+func runTestCaseSingle(filename string, theCase *tc.TestCase, printLog bool) {
+	//ReloadQueryExecutorFn(path.Join(os.Getenv("AOTDIR"), "out"))
+	runTestCaseWithGasLimit(filename, theCase, printLog, -1, ESTIMATE_GAS)
+}
+
 func runTestCaseDual(filename string, theCase *tc.TestCase, printLog bool) {
 	copiedCase := &tc.TestCase{
 		Name:      theCase.Name,
@@ -356,12 +409,12 @@ func runTestCaseDual(filename string, theCase *tc.TestCase, printLog bool) {
 		RefState:  theCase.RefState.Clone(),
 		Blocks:    theCase.Blocks,
 	}
-	estimatedGas := runTestCaseWithGasLimit(filename, theCase, printLog, -1, 1)
+	estimatedGas := runTestCaseWithGasLimit(filename, theCase, printLog, -1, ESTIMATE_GAS)
 	fmt.Printf("estimatedGas %d\n", estimatedGas)
 	if estimatedGas < 0 {
 		panic("Error during estimation")
 	} else if estimatedGas > 0 {
-		runTestCaseWithGasLimit(filename, copiedCase, printLog, estimatedGas, 2)
+		runTestCaseWithGasLimit(filename, copiedCase, printLog, estimatedGas, CHECK_GAS)
 	}
 }
 
@@ -414,6 +467,9 @@ func runTestCaseWithGasLimit(filename string, theCase *tc.TestCase, printLog boo
 	if len(currTx.Data) != 0 {
 		data_ptr = (*C.uint8_t)(unsafe.Pointer(&currTx.Data[0]))
 	}
+
+	updateQueryExecutorFn(currTx.To, WORLD.Bytecodes[currTx.To])
+
 	estimatedGas := C.zero_depth_call_wrap(gas_price,
 		C.int64_t(currTx.Gas),
 		&to,
@@ -423,7 +479,9 @@ func runTestCaseWithGasLimit(filename string, theCase *tc.TestCase, printLog boo
 		C.size_t(len(currTx.Data)),
 		&bi,
 		0,
-		C.bool(mode == ESTIMATE_GAS))
+		C.bool(mode == ESTIMATE_GAS),
+		C.EVMC_ISTANBUL,
+		QueryExecutorFn)
 
 	blockReward.SetUint64(2000000000000000000)
 	tc.AddBlockReward(WORLD, currBlock.Coinbase, &blockReward)
@@ -503,7 +561,7 @@ func getDeployedCode() {
 func main() {
 	args := os.Args
 	me := args[0]
-	fn := runTestCaseDual
+	fn := runTestCaseSingle // runTestCaseSingle or runTestCaseDual
 	if strings.HasSuffix(me, "run_test_case") {
 		tc.RunOneCase(args, true, fn)
 	} else if strings.HasSuffix(me, "run_test_file") {

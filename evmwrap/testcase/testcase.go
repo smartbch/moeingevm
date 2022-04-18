@@ -309,6 +309,14 @@ func hexToNum(hi, lo uint8) uint8 {
 }
 
 func fillBytes(tokens []string, data *[]byte) []string {
+	if strings.HasPrefix(tokens[0], "0x") {
+		var err error
+		*data, err = hex.DecodeString(tokens[0][2:])
+		if err != nil {
+			panic(err)
+		}
+		return tokens[1:]
+	}
 	size, _ := strconv.Atoi(tokens[0])
 	tokens = tokens[1:]
 	*data = make([]byte, 0, size)

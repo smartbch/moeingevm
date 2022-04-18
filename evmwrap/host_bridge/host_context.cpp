@@ -190,7 +190,7 @@ bytes rlp_encode(const std::vector<bytes>& input_vec) {
 bytes rlp_encode_address(const evmc_address& addr) {
 	bytes result;
 	result.reserve(20);
-	for(int i=0; i < sizeof(evmc_address); i++) {
+	for(size_t i=0; i < sizeof(evmc_address); i++) {
 		result.append(1, char(addr.bytes[i]));
 	}
 	return result;
@@ -610,6 +610,12 @@ int64_t intrinsic_gas(const uint8_t* input_data, size_t input_size, bool is_cont
 	return gas;
 }
 
+__inline__ uint64_t rdtsc() {
+  uint64_t a, d;
+  __asm__ volatile ("rdtsc" : "=a" (a), "=d" (d));
+  return (d<<32) | a;
+}
+
 int64_t zero_depth_call(evmc_uint256be gas_price,
                      int64_t gas_limit,
                      const evmc_address* destination,
@@ -621,6 +627,7 @@ int64_t zero_depth_call(evmc_uint256be gas_price,
 		     int handler,
 		     bool need_gas_estimation,
 		     enum evmc_revision revision,
+		     bridge_query_executor_fn query_executor_fn,
 		     bridge_get_creation_counter_fn get_creation_counter_fn,
 		     bridge_get_account_info_fn get_account_info_fn,
 		     bridge_get_bytecode_fn get_bytecode_fn,
@@ -677,19 +684,30 @@ int64_t zero_depth_call(evmc_uint256be gas_price,
 		.input_size = input_size,
 		.value = *value
 	};
-	evmc_vm* vm = evmc_create_evmone();
+	evmc_vm* vm = nullptr;
+	evmc_execute_fn executor = nullptr;
+	if(query_executor_fn) { // Check AOT
+		executor = query_executor_fn(destination);
+	}
+	if(!executor) {
+		vm = evmc_create_evmone();
+		executor = vm->execute;
+	}
 
-	tx_control txctrl(&r, tx_context, vm->execute, call_precompiled_contract_fn, need_gas_estimation, block->cfg);
+	tx_control txctrl(&r, tx_context, executor, call_precompiled_contract_fn, need_gas_estimation, block->cfg);
 	small_buffer smallbuf;
 	evmc_host_context ctx(&txctrl, msg, &smallbuf, revision);
 	uint256 balance = ctx.get_balance_as_uint256(*sender);
 	if(balance < u256be_to_u256(*value)) {
 		evmc_result result {.status_code=EVMC_INSUFFICIENT_BALANCE, .gas_left=msg.gas};
 		txctrl.collect_result(collect_result_fn, handler, &result);
-		vm->destroy(vm);
+		if(vm) vm->destroy(vm);
 		return 0;
 	}
+	//uint64_t t = rdtsc();
 	evmc_result result = ctx.call(msg);
+	//t = rdtsc() - t;
+	//std::cout<<"Time used: "<<t<<std::endl;
 	txctrl.collect_result(collect_result_fn, handler, &result);
 	int64_t gas_estimated = 0;
 	if(need_gas_estimation) {
@@ -702,7 +720,7 @@ int64_t zero_depth_call(evmc_uint256be gas_price,
 			}
 		}
 	}
-	vm->destroy(vm);
+	if(vm) vm->destroy(vm);
 	if (result.release != nullptr) {
 		result.release(&result);
 	}
