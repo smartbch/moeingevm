@@ -17,11 +17,11 @@ import (
 )
 
 const (
-	Range = int64(1000)
-	NumTestPerStep = int64(100)
+	Range = int64(300)
+	NumTestPerStep = int64(10)
 	MinDuration = int64(50)
 	MaxDuration = int64(150)
-	NumGoRoutine = int64(200)
+	NumGoRoutine = int64(30)
 )
 
 var (
@@ -33,16 +33,18 @@ func add(key, value int64, height uint32) {
 	C.add(C.int64_t(key), C.int64_t(value), C.uint32_t(height));
 }
 
-func give_back(key int64, height uint32) {
-	C.give_back(C.int64_t(key), C.uint32_t(height));
+func give_back(key int64, height uint32) uint64 {
+	sizes := C.give_back(C.int64_t(key), C.uint32_t(height));
+	return uint64(sizes)
 }
 
 func borrow(key int64) (*int64) {
 	return (*int64)(C.borrow(C.int64_t(key)));
 }
 
-func check(num, duration, height int64) {
+func check(jobID, num, duration, height int64) uint64 {
 	negNumPtr := borrow(num)
+	sizes := uint64(0)
 	if atomic.LoadInt64(negNumPtr) == 0 { // cache miss
 		time.Sleep(time.Duration(duration*int64(time.Millisecond)))
 		add(num, -num, uint32(height))
@@ -55,9 +57,10 @@ func check(num, duration, height int64) {
 		if neg := atomic.LoadInt64(negNumPtr); neg != -num {
 			panic(fmt.Sprintf("%d != %d", neg, -num))
 		}
-		give_back(num, uint32(height))
+		sizes = give_back(num, uint32(height))
 		atomic.AddInt64(&TotalHit, 1)
 	}
+	return sizes
 }
 
 func checkBetween(jobID, from, to, seed int64) {
@@ -65,12 +68,16 @@ func checkBetween(jobID, from, to, seed int64) {
 	rand := mt19937.New()
 	rand.Seed(seed)
 	for i := from; i < to; i++ {
-		fmt.Printf("Job#%d %d %d %d\n", jobID, i, atomic.LoadInt64(&TotalHit), atomic.LoadInt64(&TotalMiss))
+		sizes := uint64(0)
 		for j := int64(0); j < NumTestPerStep; j++ {
 			offset := rand.Int63() % Range
 			duration := MinDuration + rand.Int63() % (MaxDuration-MinDuration)
-			check(i-Range/2+offset, duration, i*NumTestPerStep+j)
+			sz := check(jobID, i-Range/2+offset, duration, i*NumTestPerStep+j)
+			if sz != 0 {
+				sizes = sz
+			}
 		}
+		fmt.Printf("Job#%d %d h=%d m=%d s=%x\n", jobID, i, atomic.LoadInt64(&TotalHit), atomic.LoadInt64(&TotalMiss), sizes)
 	}
 }
 

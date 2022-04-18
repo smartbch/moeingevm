@@ -97,4 +97,8 @@ public:
 		m.emplace(key, PayloadAndHistory{payload: std::move(payload), history: history}); // add a new entry
 		mtx.unlock();
 	}
+
+	size_t size() {
+		return m.size();
+	}
 };

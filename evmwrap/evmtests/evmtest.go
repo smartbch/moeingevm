@@ -402,6 +402,7 @@ func runTestCaseSingle(filename string, theCase *tc.TestCase, printLog bool) {
 	runTestCaseWithGasLimit(filename, theCase, printLog, -1, ESTIMATE_GAS)
 }
 
+//nolint:deadcode
 func runTestCaseDual(filename string, theCase *tc.TestCase, printLog bool) {
 	copiedCase := &tc.TestCase{
 		Name:      theCase.Name,
