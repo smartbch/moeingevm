@@ -90,7 +90,6 @@ bridge_query_executor_fn load_func_from_dl(_GoString_ path, int* status) {
         }
         
         bridge_query_executor_fn f = (bridge_query_executor_fn)dlsym(lib_handle, "query_executor");
-	printf("bridge_query_executor_fn %08lx\n", (size_t)f);
         char* errorInfo = dlerror();
         if (errorInfo != NULL) {
                 *status = SYMBOL_NOT_FOUND;
@@ -138,7 +137,6 @@ func ReloadQueryExecutorFn(aotDir string) {
 
 	var status C.int
 	QueryExecutorFn = C.load_func_from_dl(libFile+"\x00", &status)
-	//fmt.Printf("QueryExecutorFn %#v\n", QueryExecutorFn)
 	if status != 0 {
 		panic("Failed to load dynamic library")
 	}

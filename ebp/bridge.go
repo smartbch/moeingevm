@@ -103,6 +103,7 @@ import "C"
 import (
 	"os"
 	"path"
+	"strings"
 )
 
 var (
@@ -116,11 +117,18 @@ func ReloadQueryExecutorFn(aotDir string) {
 		panic(err)
 	}
 
-	if len(files) == 0 {
+	libFiles := make([]string, 0, len(files))
+	for _, entry := range files {
+		if strings.HasPrefix(entry.Name(), "lib") {
+			libFiles = append(libFiles, entry.Name())
+		}
+	}
+
+	if len(libFiles) == 0 {
 		return
 	}
 
-	libFile := path.Join(aotDir, files[len(files)-1].Name())
+	libFile := path.Join(aotDir, libFiles[len(libFiles)-1])
 	if libFile == lastFile {
 		return
 	}
