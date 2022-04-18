@@ -6,6 +6,7 @@
 #include "analysis.hpp"
 #include "cache.hpp"
 #include <memory>
+#include <cstdlib>
 
 namespace evmone
 {
@@ -30,19 +31,27 @@ AnalysisCache CacheShards[AnalysisCache::SHARD_COUNT];
 evmc_result execute(evmc_vm* /*unused*/, const evmc_host_interface* host, evmc_host_context* ctx,
     evmc_revision rev, const evmc_message* msg, const uint8_t* code, size_t code_size) noexcept
 {
+    static int disable_cache = -1;
+    if(disable_cache<0) {
+        disable_cache = (std::getenv("DISABLE_ANALYSIS_CACHE") == nullptr)? 0 : 1;
+    }
     auto state = std::make_unique<AdvancedExecutionState>(*msg, rev, *host, ctx, code, code_size);
+    if(disable_cache>0) {
+        auto analysis = analyze(rev, code, code_size);
+        return execute(*state, analysis);
+    }
     std::string key((const char*)(msg->destination.bytes), 20);
     int sid = int(msg->destination.bytes[19]) % AnalysisCache::SHARD_COUNT; //shard id
     const auto height = static_cast<uint32_t>(state->host.get_tx_context().block_number);
     const AdvancedCodeAnalysis& analysis = CacheShards[sid].borrow(key);
     evmc_result res;
     if(analysis.instrs.size() > 0) { // cache hit
-            res = execute(*state, analysis);
-	    CacheShards[sid].give_back(key, height);
+        res = execute(*state, analysis);
+        CacheShards[sid].give_back(key, height);
     } else { //cache miss
-	    auto new_analysis = analyze(rev, code, code_size);
-            res = execute(*state, new_analysis);
-	    CacheShards[sid].add(key, new_analysis, height);
+        auto new_analysis = analyze(rev, code, code_size);
+        res = execute(*state, new_analysis);
+        CacheShards[sid].add(key, new_analysis, height);
     }
     return res;
 }

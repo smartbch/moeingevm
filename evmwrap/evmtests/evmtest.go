@@ -397,6 +397,7 @@ func updateQueryExecutorFn(addr [20]byte, info tc.BytecodeInfo) {
 	ReloadQueryExecutorFn(path.Join(aotDir, "out"))
 }
 
+//nolint:deadcode
 func runTestCaseSingle(filename string, theCase *tc.TestCase, printLog bool) {
 	//ReloadQueryExecutorFn(path.Join(os.Getenv("AOTDIR"), "out"))
 	runTestCaseWithGasLimit(filename, theCase, printLog, -1, ESTIMATE_GAS)
