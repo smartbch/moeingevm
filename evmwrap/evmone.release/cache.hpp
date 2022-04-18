@@ -81,7 +81,7 @@ public:
 			// decrease reference count
 			iter->second.history -= 1;
 			uint32_t latest_slot = uint32_t(iter->second.history);
-			if(latest_slot == MAX_INT32+1) { // the reference count is zero now
+			if(latest_slot == MAX_INT32) { // the reference count is zero now
 				// set the latest slot as a real height
 				iter->second.history = (iter->second.history^uint128_t(latest_slot)) & uint128_t(height);
 			}
