@@ -87,14 +87,14 @@ bridge_query_executor_fn load_func_from_dl(_GoString_ path, int* status) {
                 *status = FAIL_TO_OPEN;
 		return NULL;
         }
-        
+
         bridge_query_executor_fn f = (bridge_query_executor_fn)dlsym(lib_handle, "query_executor");
         char* errorInfo = dlerror();
         if (errorInfo != NULL) {
                 *status = SYMBOL_NOT_FOUND;
 		return NULL;
         }
-        
+
         *status = OK;
 	return f;
 }
@@ -140,4 +140,3 @@ func ReloadQueryExecutorFn(aotDir string) {
 		panic("Failed to load dynamic library")
 	}
 }
-

@@ -3,8 +3,8 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -353,13 +353,11 @@ const (
 	PRINT_POST_STATE = 3
 )
 
-func updateQueryExecutorFn(addr [20]byte, info tc.BytecodeInfo) {
+func updateQueryExecutorFn() {
 	aotDir := os.Getenv("AOTDIR")
-	if len(aotDir) == 0 || len(info.Bytecode) == 0 {
+	if len(aotDir) == 0 {
 		return
 	}
-	addrHex := hex.EncodeToString(addr[:])
-	bytecodeHex := hex.EncodeToString(info.Bytecode[:])
 	if err := os.RemoveAll(path.Join(aotDir, "in")); err != nil {
 		panic(err)
 	}
@@ -372,10 +370,19 @@ func updateQueryExecutorFn(addr [20]byte, info tc.BytecodeInfo) {
 	if err := os.Mkdir(path.Join(aotDir, "out"), 0750); err != nil {
 		panic(err)
 	}
-	if err := ioutil.WriteFile(path.Join(aotDir, "in", addrHex), []byte(bytecodeHex), 0644); err != nil {
-		panic(err)
+	totalContracts := 0
+	for addr, info := range WORLD.Bytecodes {
+		if len(info.Bytecode) == 0 {
+			continue
+		}
+		totalContracts++
+		addrHex := hex.EncodeToString(addr[:])
+		bytecodeHex := hex.EncodeToString(info.Bytecode[:])
+		if err := ioutil.WriteFile(path.Join(aotDir, "in", addrHex), []byte(bytecodeHex), 0644); err != nil {
+			panic(err)
+		}
 	}
-
+	fmt.Println("Num of compiled contracts", totalContracts)
 	cmd := exec.Command("runaot", "gen", path.Join(aotDir, "in"), path.Join(aotDir, "out"))
 	output, err := cmd.Output()
 	if err != nil {
@@ -470,7 +477,7 @@ func runTestCaseWithGasLimit(filename string, theCase *tc.TestCase, printLog boo
 		data_ptr = (*C.uint8_t)(unsafe.Pointer(&currTx.Data[0]))
 	}
 
-	updateQueryExecutorFn(currTx.To, WORLD.Bytecodes[currTx.To])
+	updateQueryExecutorFn()
 
 	estimatedGas := C.zero_depth_call_wrap(gas_price,
 		C.int64_t(currTx.Gas),

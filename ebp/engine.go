@@ -665,7 +665,7 @@ func (exec *txEngine) collectCommittableTxs(committableRunnerList []*TxRunner) {
 }
 
 func (exec *txEngine) reloadQueryExecutorFn() {
-	if exec.aotReloadInterval == 0 || exec.currentBlock.Number % exec.aotReloadInterval != 0 {
+	if exec.aotReloadInterval == 0 || exec.currentBlock.Number%exec.aotReloadInterval != 0 {
 		return
 	}
 	ReloadQueryExecutorFn(exec.aotDir)

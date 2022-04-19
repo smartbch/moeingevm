@@ -9,51 +9,51 @@ import "C"
 
 import (
 	"fmt"
-	"time"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/seehuhn/mt19937"
 )
 
 const (
-	Range = int64(300)
+	Range          = int64(300)
 	NumTestPerStep = int64(10)
-	MinDuration = int64(50)
-	MaxDuration = int64(150)
-	NumGoRoutine = int64(30)
+	MinDuration    = int64(50)
+	MaxDuration    = int64(150)
+	NumGoRoutine   = int64(30)
 )
 
 var (
-	TotalHit = int64(0)
+	TotalHit  = int64(0)
 	TotalMiss = int64(0)
 )
 
 func add(key, value int64, height uint32) {
-	C.add(C.int64_t(key), C.int64_t(value), C.uint32_t(height));
+	C.add(C.int64_t(key), C.int64_t(value), C.uint32_t(height))
 }
 
 func give_back(key int64, height uint32) uint64 {
-	sizes := C.give_back(C.int64_t(key), C.uint32_t(height));
+	sizes := C.give_back(C.int64_t(key), C.uint32_t(height))
 	return uint64(sizes)
 }
 
-func borrow(key int64) (*int64) {
-	return (*int64)(C.borrow(C.int64_t(key)));
+func borrow(key int64) *int64 {
+	return (*int64)(C.borrow(C.int64_t(key)))
 }
 
 func check(jobID, num, duration, height int64) uint64 {
 	negNumPtr := borrow(num)
 	sizes := uint64(0)
 	if atomic.LoadInt64(negNumPtr) == 0 { // cache miss
-		time.Sleep(time.Duration(duration*int64(time.Millisecond)))
+		time.Sleep(time.Duration(duration * int64(time.Millisecond)))
 		add(num, -num, uint32(height))
 		atomic.AddInt64(&TotalMiss, 1)
 	} else { //cache hit
 		if neg := atomic.LoadInt64(negNumPtr); neg != -num {
 			panic(fmt.Sprintf("%d != %d", neg, -num))
 		}
-		time.Sleep(time.Duration(duration*int64(time.Millisecond)))
+		time.Sleep(time.Duration(duration * int64(time.Millisecond)))
 		if neg := atomic.LoadInt64(negNumPtr); neg != -num {
 			panic(fmt.Sprintf("%d != %d", neg, -num))
 		}
@@ -71,7 +71,7 @@ func checkBetween(jobID, from, to, seed int64) {
 		sizes := uint64(0)
 		for j := int64(0); j < NumTestPerStep; j++ {
 			offset := rand.Int63() % Range
-			duration := MinDuration + rand.Int63() % (MaxDuration-MinDuration)
+			duration := MinDuration + rand.Int63()%(MaxDuration-MinDuration)
 			sz := check(jobID, i-Range/2+offset, duration, i*NumTestPerStep+j)
 			if sz != 0 {
 				sizes = sz
@@ -93,4 +93,3 @@ func main() {
 	}
 	wg.Wait()
 }
-
