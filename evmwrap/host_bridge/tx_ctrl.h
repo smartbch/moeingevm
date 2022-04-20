@@ -358,6 +358,7 @@ class tx_control {
 	world_state_reader* world;
 	evmc_tx_context tx_context;
 	evmc_execute_fn execute_fn;
+	bridge_query_executor_fn query_executor_fn;
 	bool need_gas_estimation;
 	config cfg;
 public:
@@ -365,8 +366,8 @@ public:
 	bridge_call_precompiled_contract_fn call_precompiled_contract;
 
 	tx_control(world_state_reader* r, const evmc_tx_context& c, evmc_execute_fn f,
-		bridge_call_precompiled_contract_fn cpc, bool nge, const config cfg):
-		journal(), cstate(r), world(r), tx_context(c), execute_fn(f),
+		bridge_query_executor_fn qef, bridge_call_precompiled_contract_fn cpc, bool nge, const config cfg):
+		journal(), cstate(r), world(r), tx_context(c), execute_fn(f), query_executor_fn(qef),
 		need_gas_estimation(nge), cfg(cfg), call_precompiled_contract(cpc) {
 		journal.reserve(100);
 		if(need_gas_estimation) {
@@ -391,9 +392,18 @@ public:
 	                    struct evmc_host_context* context,
 	                    enum evmc_revision rev,
 	                    const struct evmc_message* msg,
+			    const struct evmc_address* code_addr,
 	                    uint8_t const* code,
 	                    size_t code_size) {
-		return execute_fn(vm, host, context, rev, msg, code, code_size);
+		evmc_execute_fn executor = nullptr;
+		if(query_executor_fn && code_addr) { // Check AOT
+			executor = query_executor_fn(code_addr);
+		}
+		if(!executor) {
+			executor = execute_fn;
+		}
+		//std::cout<<"query "<<to_hex(msg->destination)<<" "<<size_t(executor)<<std::endl;
+		return executor(vm, host, context, rev, msg, code, code_size);
 	}
 	// a snapshot is just a position of the journal entry list
 	size_t snapshot() {

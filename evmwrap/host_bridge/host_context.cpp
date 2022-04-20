@@ -345,7 +345,7 @@ evmc_result evmc_host_context::call(const evmc_message& call_msg) {
 			if(call_msg.kind == EVMC_CALL) {
 				ctx.check_eip158();
 			}
-			result = ctx.run_vm(txctrl->snapshot());
+			result = ctx.run_vm(txctrl->snapshot(), &call_msg.destination);
 		}
 	}
 	txctrl->gas_trace_append(result.gas_left);
@@ -401,7 +401,7 @@ evmc_result evmc_host_context::call() {
 			txctrl->revert_to_snapshot(snapshot);
 		}
 	} else {
-		result = run_vm(snapshot);
+		result = run_vm(snapshot, &msg.destination);
 	}
 	
 	return result;
@@ -484,12 +484,12 @@ evmc_result evmc_host_context::run_precompiled_contract_echo() {
 		.output_size=msg.input_size};
 }
 
-evmc_result evmc_host_context::run_vm(size_t snapshot) {
+evmc_result evmc_host_context::run_vm(size_t snapshot, const evmc_address* code_addr) {
 	if(this->code->size() == 0) {
 		return evmc_result{.status_code=EVMC_SUCCESS, .gas_left=msg.gas}; // do nothing
 	}
 	evmc_result result = txctrl->execute(nullptr, &HOST_IFC, this, this->revision, &msg,
-			this->code->data(), this->code->size());
+			code_addr, this->code->data(), this->code->size());
 	if(result.status_code != EVMC_SUCCESS) {
 		txctrl->revert_to_snapshot(snapshot);
 	}
@@ -548,7 +548,7 @@ evmc_result evmc_host_context::create_with_contract_addr(const evmc_address& add
 	txctrl->set_bytecode(addr, bytes(), HASH_FOR_ZEROCODE);
 	txctrl->transfer(msg.sender, addr, u256be_to_u256(msg.value));
 
-	evmc_result result = this->run_vm(snapshot);
+	evmc_result result = this->run_vm(snapshot, nullptr);
 	if(result.status_code == EVMC_REVERT) {
 		return result;
 	}
@@ -684,24 +684,16 @@ int64_t zero_depth_call(evmc_uint256be gas_price,
 		.input_size = input_size,
 		.value = *value
 	};
-	evmc_vm* vm = nullptr;
-	evmc_execute_fn executor = nullptr;
-	if(query_executor_fn) { // Check AOT
-		executor = query_executor_fn(destination);
-	}
-	if(!executor) {
-		vm = evmc_create_evmone();
-		executor = vm->execute;
-	}
-
-	tx_control txctrl(&r, tx_context, executor, call_precompiled_contract_fn, need_gas_estimation, block->cfg);
+	evmc_vm* vm = evmc_create_evmone();
+	tx_control txctrl(&r, tx_context, vm->execute, query_executor_fn, 
+			call_precompiled_contract_fn, need_gas_estimation, block->cfg);
 	small_buffer smallbuf;
 	evmc_host_context ctx(&txctrl, msg, &smallbuf, revision);
 	uint256 balance = ctx.get_balance_as_uint256(*sender);
 	if(balance < u256be_to_u256(*value)) {
 		evmc_result result {.status_code=EVMC_INSUFFICIENT_BALANCE, .gas_left=msg.gas};
 		txctrl.collect_result(collect_result_fn, handler, &result);
-		if(vm) vm->destroy(vm);
+		vm->destroy(vm);
 		return 0;
 	}
 	//uint64_t t = rdtsc();
@@ -720,7 +712,7 @@ int64_t zero_depth_call(evmc_uint256be gas_price,
 			}
 		}
 	}
-	if(vm) vm->destroy(vm);
+	vm->destroy(vm);
 	if (result.release != nullptr) {
 		result.release(&result);
 	}

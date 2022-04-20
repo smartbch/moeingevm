@@ -170,7 +170,7 @@ public:
 	evmc_result sep206_transferFrom();
 	evmc_result call(const evmc_message& msg);
 	evmc_result call();
-	evmc_result run_vm(size_t snapshot);
+	evmc_result run_vm(size_t snapshot, const evmc_address* code_addr);
 	evmc_result create();
 	evmc_result create2();
 	bool create_pre_check(const evmc_address& new_addr);

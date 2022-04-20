@@ -29,7 +29,7 @@ class Cache {
 			if(uint32_t(h) > MAX_INT32) { //it's in use
 				continue; //ignore it
 			}
-			// sum the heights of heights of last four accesses as the score
+			// sum the heights of last four accesses as the score
 			uint64_t score = uint64_t(uint32_t(h>>96) + uint32_t(h>>64)) + 
 					 uint64_t(uint32_t(h>>32) + uint32_t(h));
 			if(min_score > score) { // record the entry with smallest score for later evicting
