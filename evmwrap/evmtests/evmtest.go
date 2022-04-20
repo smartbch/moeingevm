@@ -358,6 +358,10 @@ func updateQueryExecutorFn() {
 	if len(aotDir) == 0 {
 		return
 	}
+	if onlyReload := os.Getenv("ONLY_RELOAD"); len(onlyReload) != 0 {
+		ReloadQueryExecutorFn(path.Join(aotDir, "out"))
+		return
+	}
 	if err := os.RemoveAll(path.Join(aotDir, "in")); err != nil {
 		panic(err)
 	}
@@ -372,7 +376,7 @@ func updateQueryExecutorFn() {
 	}
 	totalContracts := 0
 	for addr, info := range WORLD.Bytecodes {
-		if len(info.Bytecode) == 0 {
+		if len(info.Bytecode) == 0 || len(info.Bytecode) > 24*1024 {
 			continue
 		}
 		totalContracts++
@@ -383,6 +387,9 @@ func updateQueryExecutorFn() {
 		}
 	}
 	fmt.Println("Num of compiled contracts", totalContracts)
+	if totalContracts == 0 {
+		return
+	}
 	cmd := exec.Command("runaot", "gen", path.Join(aotDir, "in"), path.Join(aotDir, "out"))
 	output, err := cmd.Output()
 	if err != nil {
