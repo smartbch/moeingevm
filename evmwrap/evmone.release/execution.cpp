@@ -33,7 +33,7 @@ evmc_result execute(evmc_vm* /*unused*/, const evmc_host_interface* host, evmc_h
 {
     static int disable_cache = -1;
     if(disable_cache<0) {
-        disable_cache = (std::getenv("DISABLE_ANALYSIS_CACHE") == nullptr)? 0 : 1;
+        disable_cache = (std::getenv("EVMONE_DISABLE_ANALYSIS_CACHE") == nullptr)? 0 : 1;
     }
     auto state = std::make_unique<AdvancedExecutionState>(*msg, rev, *host, ctx, code, code_size);
     if(disable_cache>0) {
@@ -48,10 +48,12 @@ evmc_result execute(evmc_vm* /*unused*/, const evmc_host_interface* host, evmc_h
     if(analysis.instrs.size() > 0) { // cache hit
         res = execute(*state, analysis);
         CacheShards[sid].give_back(key, height);
-    } else { //cache miss
+    } else  { // cache miss
         auto new_analysis = analyze(rev, code, code_size);
         res = execute(*state, new_analysis);
-        CacheShards[sid].add(key, new_analysis, height);
+        if(msg->kind != EVMC_CREATE && msg->kind != EVMC_CREATE2) { // add to cache
+            CacheShards[sid].add(key, new_analysis, height);
+        }
     }
     return res;
 }

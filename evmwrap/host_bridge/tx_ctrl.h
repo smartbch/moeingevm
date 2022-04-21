@@ -399,7 +399,7 @@ public:
 		if(query_executor_fn && code_addr) { // Check AOT
 			executor = query_executor_fn(code_addr);
 		}
-		if(!executor) {
+		if(!executor) { // fall back to the interpreter
 			executor = execute_fn;
 		}
 		//std::cout<<"query "<<to_hex(msg->destination)<<" "<<size_t(executor)<<std::endl;
