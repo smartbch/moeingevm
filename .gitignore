@@ -27,3 +27,8 @@ ebp/ebptests/rocksdb.db/
 evmwrap/evmtests/AOTDIR
 evmwrap/evmtests/deploycode
 evmwrap/cachetest/cachetest
+*.un~
+*.go~
+*.cpp~
+*.hpp~
+*.h~
