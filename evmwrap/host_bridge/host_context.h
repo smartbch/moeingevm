@@ -80,6 +80,7 @@ private:
 	tx_control* txctrl;
 	evmc_message msg;
 	const bytes* code;
+	evmc_bytes32 codehash;
 	bytes empty_code;
 	small_buffer *smallbuf;
 	enum evmc_revision revision;
@@ -87,6 +88,9 @@ public:
 	evmc_host_context(tx_control* tc, evmc_message m, small_buffer* b, enum evmc_revision r):
 		txctrl(tc), msg(m), empty_code(), smallbuf(b), revision(r) {}
 
+	const evmc_bytes32& get_codehash() {
+		return codehash;
+	}
 	bool account_exists(const evmc_address& addr) {
 		const account_info& info = txctrl->get_account(addr);
 		// To pass some of the tests, we need to check bytecode for emptyness, instead of only account sequence

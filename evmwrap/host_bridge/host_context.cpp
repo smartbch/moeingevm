@@ -305,7 +305,9 @@ void evmc_host_context::load_code(const evmc_address& addr) {
 	if(acc.is_null()) {
 		this->code = &this->empty_code;
 	}
-	this->code = &txctrl->get_bytecode_entry(addr).bytecode;
+	const bytecode_entry& entry = txctrl->get_bytecode_entry(addr);
+	this->code = &entry.bytecode;
+	this->codehash = entry.codehash;
 }
 
 evmc_result evmc_host_context::call(const evmc_message& call_msg) {
@@ -538,6 +540,7 @@ evmc_result evmc_host_context::create_with_contract_addr(const evmc_address& add
 	msg.destination = addr;
 	bytes input_as_code(msg.input_data, msg.input_size);
 	this->code = &input_as_code;
+	this->codehash = ZERO_BYTES32;
 	msg.input_size = 0;
 
 	size_t snapshot = txctrl->snapshot(); //if failed, revert account creation
