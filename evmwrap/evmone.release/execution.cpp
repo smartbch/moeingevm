@@ -42,7 +42,7 @@ evmc_result execute(evmc_vm* /*unused*/, const evmc_host_interface* host, evmc_h
         return execute(*state, analysis);
     }
     std::string key((const char*)(ctx->get_codehash().bytes), 32);
-    int sid = int(key[31]) % AnalysisCache::SHARD_COUNT; //shard id
+    int sid = int(uint8_t(key[31])) % AnalysisCache::SHARD_COUNT; //shard id
     const auto height = static_cast<uint32_t>(state->host.get_tx_context().block_number);
     const AdvancedCodeAnalysis& analysis = CacheShards[sid].borrow(key);
     evmc_result res;
