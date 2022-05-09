@@ -32,3 +32,4 @@ evmwrap/cachetest/cachetest
 *.cpp~
 *.hpp~
 *.h~
+*.sh~

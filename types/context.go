@@ -340,7 +340,7 @@ func (c *Context) BasicQueryLogs(address common.Address, topics []common.Hash,
 
 	var rawAddress [20]byte = address
 	rawTopics := FromGethHashes(topics)
-	c.Db.BasicQueryLogs(&rawAddress, rawTopics, startHeight, endHeight, func(data []byte) (needMore bool) {
+	err = c.Db.BasicQueryLogs(&rawAddress, rawTopics, startHeight, endHeight, func(data []byte) (needMore bool) {
 		if data == nil {
 			err = ErrTooManyEntries
 			return false
@@ -366,7 +366,6 @@ func (c *Context) BasicQueryLogs(address common.Address, topics []common.Hash,
 		}
 		return true
 	})
-
 	return
 }
 
@@ -379,7 +378,7 @@ func (c *Context) QueryLogs(addresses []common.Address, topics [][]common.Hash, 
 		rawTopics[i] = FromGethHashes(t)
 	}
 
-	c.Db.QueryLogs(rawAddresses, rawTopics, startHeight, endHeight, func(data []byte) bool {
+	err = c.Db.QueryLogs(rawAddresses, rawTopics, startHeight, endHeight, func(data []byte) bool {
 		if data == nil {
 			err = ErrTooManyEntries
 			return false
@@ -400,12 +399,11 @@ func (c *Context) QueryLogs(addresses []common.Address, topics [][]common.Hash, 
 		}
 		return true
 	})
-
 	return
 }
 
 func (c *Context) QueryTxBySrc(addr common.Address, startHeight, endHeight, limit uint32) (txs []*Transaction, sigs [][65]byte, err error) {
-	c.Db.QueryTxBySrc(addr, startHeight, endHeight, func(data []byte) bool {
+	err = c.Db.QueryTxBySrc(addr, startHeight, endHeight, func(data []byte) bool {
 		if data == nil {
 			err = ErrTooManyEntries
 			return false
@@ -429,7 +427,7 @@ func (c *Context) QueryTxBySrc(addr common.Address, startHeight, endHeight, limi
 }
 
 func (c *Context) QueryTxByDst(addr common.Address, startHeight, endHeight, limit uint32) (txs []*Transaction, sigs [][65]byte, err error) {
-	c.Db.QueryTxByDst(addr, startHeight, endHeight, func(data []byte) bool {
+	err = c.Db.QueryTxByDst(addr, startHeight, endHeight, func(data []byte) bool {
 		if data == nil {
 			err = ErrTooManyEntries
 			return false
@@ -453,7 +451,7 @@ func (c *Context) QueryTxByDst(addr common.Address, startHeight, endHeight, limi
 }
 
 func (c *Context) QueryTxByAddr(addr common.Address, startHeight, endHeight, limit uint32) (txs []*Transaction, sigs [][65]byte, err error) {
-	c.Db.QueryTxBySrcOrDst(addr, startHeight, endHeight, func(data []byte) bool {
+	err = c.Db.QueryTxBySrcOrDst(addr, startHeight, endHeight, func(data []byte) bool {
 		if data == nil {
 			err = ErrTooManyEntries
 			return false
@@ -524,3 +522,5 @@ func (c *Context) GetSep20FromAddressCount(contract common.Address, addr common.
 	k = append(k, addr[:]...)
 	return c.Db.QueryNotificationCounter(k)
 }
+
+//	QueryTxBySrcOrDst(addr [20]byte, startHeight, endHeight uint32, fn func([]byte) bool) error
