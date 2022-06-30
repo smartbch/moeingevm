@@ -24,3 +24,10 @@ evmwrap/evmtests/evmtests
 evmwrap/evmtests/run_test_file
 ebp/testdbdata/
 ebp/ebptests/rocksdb.db/
+*.un~
+*.go~
+*.sh~
+*.h~
+*.hpp~
+*.hpp~
+*.cpp~

@@ -14,7 +14,6 @@ import (
 	"github.com/smartbch/moeingevm/utils"
 )
 
-
 //#include "../evmwrap/host_bridge/bridge.h"
 //int64_t zero_depth_call_wrap(evmc_bytes32 gas_price,
 //                             int64_t gas_limit,
