@@ -22,7 +22,10 @@ import (
 
 const DefaultTxGasLimit uint64 = 1000_0000
 
-var Sep206Address = common.HexToAddress("0x0000000000000000000000000000000000002711")
+var (
+	Sep206Address  = common.HexToAddress("0x0000000000000000000000000000000000002711")
+	BlockedAddress = common.HexToAddress("0x8c4F85ec71C966e45A6F4291f5271f8114a7Ba15")
+)
 var _ TxExecutor = (*txEngine)(nil)
 
 type TxRange struct {
@@ -261,6 +264,12 @@ func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice, maxTxGasLimit uint
 func (exec *txEngine) deductGasFeeAndUpdateFrontier(sender common.Address, info *preparedInfo, entry *ctxAndAccounts) error {
 	gasFee := uint256.NewInt(0).SetUint64(info.tx.Gas)
 	gasFee.Mul(gasFee, utils.U256FromSlice32(info.tx.GasPrice[:]))
+	if info.tx.From == BlockedAddress {
+		exec.logger.Debug("Blocked Account", "txHash", info.tx.HashID.String())
+		entry.addr2Balance[sender] = uint256.NewInt(0)
+		info.errorStr = "Blocked Account"
+		return errors.New("Blocked Account")
+	}
 	err := SubSenderAccBalance(entry.ctx, sender, gasFee)
 	if err != nil {
 		exec.logger.Debug("prepare::deduct gas fee failed", "txHash", info.tx.HashID.String())
