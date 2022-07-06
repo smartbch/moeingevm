@@ -32,7 +32,7 @@ AnalysisCache CacheShards[AnalysisCache::SHARD_COUNT];
 evmc_result execute(evmc_vm* /*unused*/, const evmc_host_interface* host, evmc_host_context* ctx,
     evmc_revision rev, const evmc_message* msg, const uint8_t* code, size_t code_size) noexcept
 {
-    static int disable_cache = -1;
+    static int disable_cache = 1;
     if(disable_cache<0) {
         disable_cache = (std::getenv("EVMONE_DISABLE_ANALYSIS_CACHE") == nullptr)? 0 : 1;
     }
