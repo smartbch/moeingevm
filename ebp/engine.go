@@ -7,16 +7,17 @@ import (
 	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/holiman/uint256"
 	"github.com/seehuhn/mt19937"
+	"github.com/tendermint/tendermint/libs/log"
+
 	dt "github.com/smartbch/moeingads/datatree"
 	"github.com/smartbch/moeingads/store/rabbit"
 	storetypes "github.com/smartbch/moeingads/store/types"
-	modbtypes "github.com/smartbch/moeingdb/types"
 	"github.com/smartbch/moeingdb/modb"
-	"github.com/tendermint/tendermint/libs/log"
+	modbtypes "github.com/smartbch/moeingdb/types"
 
 	"github.com/smartbch/moeingevm/types"
 	"github.com/smartbch/moeingevm/utils"
@@ -836,7 +837,7 @@ func GetBlackHoleBalance(ctx *types.Context) *uint256.Int {
 var (
 	NewRedeemable   = crypto.Keccak256Hash([]byte("NewRedeemable(uint256,uint32,address)"))
 	NewLostAndFound = crypto.Keccak256Hash([]byte("NewLostAndFound(uint256,uint32,address)"))
-	Redeem          = crypto.Keccak256Hash([]byte("Redeem(uint256,uint32,address,address)"))
+	Redeem          = crypto.Keccak256Hash([]byte("Redeem(uint256,uint32,address,uint8)"))
 	ChangeAddr      = crypto.Keccak256Hash([]byte("ChangeAddr(uint256,uint32,address,address)"))
 	Deleted         = crypto.Keccak256Hash([]byte("Deleted(uint256,uint32,address,uint8)"))
 	CcContractAddr  = [20]byte{} //TODO
