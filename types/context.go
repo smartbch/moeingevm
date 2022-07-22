@@ -100,6 +100,7 @@ func (c *Context) WithRbtCopy() *Context {
 		Rbt:              &r,
 		Db:               c.Db,
 		ShaGateForkBlock: c.ShaGateForkBlock,
+		StakingForkBlock: c.StakingForkBlock,
 		XHedgeForkBlock:  c.XHedgeForkBlock,
 		Height:           c.Height,
 	}
