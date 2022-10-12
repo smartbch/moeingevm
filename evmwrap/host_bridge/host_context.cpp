@@ -613,11 +613,11 @@ int64_t intrinsic_gas(const uint8_t* input_data, size_t input_size, bool is_cont
 	return gas;
 }
 
-__inline__ uint64_t rdtsc() {
-  uint64_t a, d;
-  __asm__ volatile ("rdtsc" : "=a" (a), "=d" (d));
-  return (d<<32) | a;
-}
+//__inline__ uint64_t rdtsc() {
+//  uint64_t a, d;
+//  __asm__ volatile ("rdtsc" : "=a" (a), "=d" (d));
+//  return (d<<32) | a;
+//}
 
 int64_t zero_depth_call(evmc_uint256be gas_price,
                      int64_t gas_limit,
