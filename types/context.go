@@ -26,6 +26,7 @@ type Context struct {
 	Height           int64
 	XHedgeForkBlock  int64
 	ShaGateForkBlock int64
+	Type             uint8
 }
 
 func NewContext(rbt *rabbit.RabbitStore, db modbtypes.DB) *Context {
@@ -55,6 +56,17 @@ func (c *Context) WithDb(db modbtypes.DB) *Context {
 		ShaGateForkBlock: c.ShaGateForkBlock,
 		Height:           c.Height,
 	}
+}
+
+const (
+	CheckTxType     = 1
+	RpcType         = 2
+	RunTxType       = 3
+	HistoryOnlyType = 4
+)
+
+func (c *Context) SetType(t uint8) {
+	c.Type = t
 }
 
 func (c *Context) SetXHedgeForkBlock(xHedgeForkBlock int64) {
