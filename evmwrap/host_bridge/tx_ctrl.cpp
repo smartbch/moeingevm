@@ -70,12 +70,17 @@ void cached_state::_set_selfdestructed(const evmc_address& addr, bool b, bool di
 }
 
 // increase an account's balance
-void cached_state::incr_balance(const evmc_address& addr, const uint256& amount, bool* old_dirty) {
+bool cached_state::incr_balance(const evmc_address& addr, const uint256& amount, bool* old_dirty) {
 	auto iter = accounts.find(addr);
 	assert(iter != accounts.end());
+	auto new_balance = iter->second.info.balance + amount;
+	if(new_balance < iter->second.info.balance) {
+		return false;
+	}
+	iter->second.info.balance = new_balance;
 	*old_dirty = iter->second.dirty;
 	iter->second.dirty = true;
-	iter->second.info.balance += amount;
+	return true;
 }
 
 // undo the effects of decr_balance
@@ -87,12 +92,16 @@ void cached_state::_incr_balance(const evmc_address& addr, const uint256& amount
 }
 
 // increase an account's balance
-void cached_state::decr_balance(const evmc_address& addr, const uint256& amount, bool* old_dirty) {
+bool cached_state::decr_balance(const evmc_address& addr, const uint256& amount, bool* old_dirty) {
 	auto iter = accounts.find(addr);
 	assert(iter != accounts.end());
+	if(iter->second.info.balance < amount) {
+		return false;
+	}
 	*old_dirty = iter->second.dirty;
 	iter->second.dirty = true;
 	iter->second.info.balance -= amount;
+	return true;
 }
 
 // undo the effects of incr_balance
@@ -394,15 +403,20 @@ void journal_entry::revert(cached_state* state) {
 // tx_control perform high-level operations on the cached state and record journals of these operations, because
 // these operations may be reverted later.
 
-void tx_control::transfer(const evmc_address& sender, const evmc_address& receiver, const uint256& amount) {
+bool tx_control::transfer(const evmc_address& sender, const evmc_address& receiver, const uint256& amount) {
 	journal_entry e {.type=BALANCE_CHG};
 	e.prev_value = u256_to_bytes(amount);
 	e.balance_change.sender = sender;
 	e.balance_change.receiver = receiver;
 	e.balance_change.is_burn = false;
-	cstate.decr_balance(sender, amount, &e.balance_change.sender_old_dirty);
-	cstate.incr_balance(receiver, amount, &e.balance_change.receiver_old_dirty);
+	if(!cstate.decr_balance(sender, amount, &e.balance_change.sender_old_dirty)) {
+		return false;
+	}
+	if(!cstate.incr_balance(receiver, amount, &e.balance_change.receiver_old_dirty)) {
+		return false;
+	}
 	journal.push_back(e);
+	return true;
 }
 
 void tx_control::burn(const evmc_address& sender, const uint256& amount) {

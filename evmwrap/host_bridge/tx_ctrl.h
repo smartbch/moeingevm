@@ -1,6 +1,6 @@
 #pragma once
 
-#include <intx/intx.hpp>
+#include <intx_nooverflow/intx_nooverflow.hpp>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -215,8 +215,8 @@ public:
 	void new_account(const evmc_address& addr);
 	void incr_nonce(const evmc_address& addr, bool* old_dirty);
 	bool set_selfdestructed(const evmc_address& addr, bool b, bool* old_dirty);
-	void incr_balance(const evmc_address& addr, const uint256& amount, bool* old_dirty);
-	void decr_balance(const evmc_address& addr, const uint256& amount, bool* old_dirty);
+	bool incr_balance(const evmc_address& addr, const uint256& amount, bool* old_dirty);
+	bool decr_balance(const evmc_address& addr, const uint256& amount, bool* old_dirty);
 	uint64_t incr_creation_counter(uint8_t lsb, bool* old_dirty);
 	const bytes& get_value(uint64_t sequence, const evmc_bytes32& key);
 	const bytes& get_origin_value(uint64_t sequence, const evmc_bytes32& key);
@@ -437,7 +437,7 @@ public:
 	const uint256& get_balance(const evmc_address& addr) {
 		return cstate.get_account(addr).balance;
 	}
-	void transfer(const evmc_address& sender, const evmc_address& receiver, const uint256& amount);
+	bool transfer(const evmc_address& sender, const evmc_address& receiver, const uint256& amount);
 	void burn(const evmc_address& sender, const uint256& amount);
 	void new_account(const evmc_address& addr);
 	void incr_nonce(const evmc_address& addr);

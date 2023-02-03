@@ -23,7 +23,10 @@ import (
 	"github.com/smartbch/moeingevm/utils"
 )
 
-const DefaultTxGasLimit uint64 = 1000_0000
+const (
+	DefaultTxGasLimit uint64 = 1000_0000
+	MaxGasPrice       uint64 = 1e19 // 10BCH
+)
 
 var (
 	Sep206Address  = common.HexToAddress("0x0000000000000000000000000000000000002711")
@@ -266,7 +269,11 @@ func (exec *txEngine) Prepare(reorderSeed int64, minGasPrice, maxTxGasLimit uint
 
 func (exec *txEngine) deductGasFeeAndUpdateFrontier(sender common.Address, info *preparedInfo, entry *ctxAndAccounts) error {
 	gasFee := uint256.NewInt(0).SetUint64(info.tx.Gas)
-	gasFee.Mul(gasFee, utils.U256FromSlice32(info.tx.GasPrice[:]))
+	gasPrice := utils.U256FromSlice32(info.tx.GasPrice[:])
+	if gasPrice.GtUint64(MaxGasPrice) {
+		gasPrice = uint256.NewInt(MaxGasPrice)
+	}
+	gasFee.Mul(gasFee, gasPrice)
 	if info.tx.From == BlockedAddress {
 		exec.logger.Debug("Blocked Account", "txHash", info.tx.HashID.String())
 		entry.addr2Balance[sender] = uint256.NewInt(0)

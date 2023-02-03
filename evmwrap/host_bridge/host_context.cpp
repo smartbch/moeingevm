@@ -365,7 +365,7 @@ void evmc_host_context::check_eip158() {
 	}
 }
 
-static inline void transfer(tx_control* txctrl, const evmc_address& sender, const evmc_address& destination, const evmc_uint256be& value, bool* is_nop) {
+static inline bool transfer(tx_control* txctrl, const evmc_address& sender, const evmc_address& destination, const evmc_uint256be& value, bool* is_nop) {
 	const account_info& acc = txctrl->get_account(destination);
 	bool zero_value = is_zero_bytes32(value.bytes);
 	bool call_precompiled = is_precompiled(destination, txctrl->get_cfg());
@@ -374,7 +374,7 @@ static inline void transfer(tx_control* txctrl, const evmc_address& sender, cons
 	if(acc.is_null() /*&& !call_precompiled*/) {
 		if(zero_value && !call_precompiled) {
 			*is_nop = true;
-			return;
+			return true;
 		}
 		txctrl->new_account(destination);
 	}
@@ -382,18 +382,24 @@ static inline void transfer(tx_control* txctrl, const evmc_address& sender, cons
 		txctrl->selfdestruct(destination);
 	}
 	if(!zero_value /*&& !call_precompiled*/) {
-		txctrl->transfer(sender, destination, u256be_to_u256(value));
+		if(!txctrl->transfer(sender, destination, u256be_to_u256(value))) {
+			return false;
+		}
 	}
 	*is_nop = false;
+	return true;
 }
 
 evmc_result evmc_host_context::call() {
 	size_t snapshot = txctrl->snapshot();
 	load_code(msg.destination);
 	bool is_nop;
-	transfer(txctrl, msg.sender, msg.destination, msg.value, &is_nop);
+	bool ok = transfer(txctrl, msg.sender, msg.destination, msg.value, &is_nop);
 	if(is_nop) {
 		return evmc_result {.status_code=EVMC_SUCCESS, .gas_left=msg.gas};
+	}
+	if(!ok) {
+		return evmc_result{.status_code = EVMC_FAILURE, .gas_left = 0};
 	}
 	evmc_result result;
 	int64_t id = get_precompiled_id(msg.destination);
@@ -549,7 +555,9 @@ evmc_result evmc_host_context::create_with_contract_addr(const evmc_address& add
 	}
 	txctrl->incr_nonce(addr);
 	txctrl->set_bytecode(addr, bytes(), HASH_FOR_ZEROCODE);
-	txctrl->transfer(msg.sender, addr, u256be_to_u256(msg.value));
+	if(!txctrl->transfer(msg.sender, addr, u256be_to_u256(msg.value))) {
+		return evmc_result{.status_code = EVMC_FAILURE, .gas_left = 0};
+	}
 
 	evmc_result result = this->run_vm(snapshot, nullptr);
 	if(result.status_code == EVMC_REVERT) {
@@ -613,11 +621,11 @@ int64_t intrinsic_gas(const uint8_t* input_data, size_t input_size, bool is_cont
 	return gas;
 }
 
-__inline__ uint64_t rdtsc() {
-  uint64_t a, d;
-  __asm__ volatile ("rdtsc" : "=a" (a), "=d" (d));
-  return (d<<32) | a;
-}
+//__inline__ uint64_t rdtsc() {
+//  uint64_t a, d;
+//  __asm__ volatile ("rdtsc" : "=a" (a), "=d" (d));
+//  return (d<<32) | a;
+//}
 
 int64_t zero_depth_call(evmc_uint256be gas_price,
                      int64_t gas_limit,
@@ -971,7 +979,9 @@ evmc_result evmc_host_context::sep206_transfer() {
 		return evmc_result{.status_code=EVMC_INSUFFICIENT_BALANCE};
 	}
 	bool is_nop;
-	transfer(txctrl, msg.sender, destination, amount_be, &is_nop);
+	if(!transfer(txctrl, msg.sender, destination, amount_be, &is_nop)) {
+		return evmc_result{.status_code=EVMC_INSUFFICIENT_BALANCE};
+	}
 	if(!is_nop) {
 		evmc_bytes32 topics[3];
 		memcpy(topics[0].bytes, TransaferEvent.bytes, 32);
@@ -998,7 +1008,8 @@ evmc_result evmc_host_context::sep206_transferFrom() {
 	if(txctrl->get_cfg().after_xhedge_fork) { //set margin=0.001BCH (10**15)
 		margin = static_cast<uint256>(1000ULL*1000ULL*1000ULL*1000ULL*1000ULL);
 	}
-	if(u256be_to_u256(balance_be) < amount+margin) {
+	auto balance = u256be_to_u256(balance_be);
+	if(balance < margin || balance - margin < amount) {
 		return evmc_result{.status_code=EVMC_INSUFFICIENT_BALANCE};
 	}
 	uint8_t owner_and_spender[64]; 
@@ -1017,7 +1028,9 @@ evmc_result evmc_host_context::sep206_transferFrom() {
 		return evmc_result{.status_code=EVMC_PRECOMPILE_FAILURE};
 	}
 	bool is_nop;
-	transfer(txctrl, source, destination, amount_be, &is_nop);
+	if(!transfer(txctrl, source, destination, amount_be, &is_nop)) {
+		return evmc_result{.status_code=EVMC_INSUFFICIENT_BALANCE};
+	}
 	if(!is_nop) {
 		evmc_bytes32 topics[3];
 		memcpy(topics[0].bytes, TransaferEvent.bytes, 32);

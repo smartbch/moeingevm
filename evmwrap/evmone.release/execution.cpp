@@ -5,7 +5,7 @@
 #include "execution.hpp"
 #include "analysis.hpp"
 #include "cache.hpp"
-#include "../host_bridge/host_context.h"
+//#include "../host_bridge/host_context.h"
 #include <memory>
 #include <cstdlib>
 
@@ -37,25 +37,25 @@ evmc_result execute(evmc_vm* /*unused*/, const evmc_host_interface* host, evmc_h
         disable_cache = (std::getenv("EVMONE_DISABLE_ANALYSIS_CACHE") == nullptr)? 0 : 1;
     }
     auto state = std::make_unique<AdvancedExecutionState>(*msg, rev, *host, ctx, code, code_size);
-    if(disable_cache>0) {
+    //if(disable_cache>0) {
         auto analysis = analyze(rev, code, code_size);
         return execute(*state, analysis);
-    }
-    std::string key((const char*)(ctx->get_codehash().bytes), 32);
-    int sid = int(uint8_t(key[31])) % AnalysisCache::SHARD_COUNT; //shard id
-    const auto height = static_cast<uint32_t>(state->host.get_tx_context().block_number);
-    const AdvancedCodeAnalysis& analysis = CacheShards[sid].borrow(key);
-    evmc_result res;
-    if(analysis.instrs.size() > 0) { // cache hit
-        res = execute(*state, analysis);
-        CacheShards[sid].give_back(key, height);
-    } else  { // cache miss
-        auto new_analysis = analyze(rev, code, code_size);
-        res = execute(*state, new_analysis);
-        if(msg->kind != EVMC_CREATE && msg->kind != EVMC_CREATE2) { // add to cache
-            CacheShards[sid].add(key, new_analysis, height);
-        }
-    }
-    return res;
+    //}
+    //std::string key((const char*)(ctx->get_codehash().bytes), 32);
+    //int sid = int(uint8_t(key[31])) % AnalysisCache::SHARD_COUNT; //shard id
+    //const auto height = static_cast<uint32_t>(state->host.get_tx_context().block_number);
+    //const AdvancedCodeAnalysis& analysis = CacheShards[sid].borrow(key);
+    //evmc_result res;
+    //if(analysis.instrs.size() > 0) { // cache hit
+    //    res = execute(*state, analysis);
+    //    CacheShards[sid].give_back(key, height);
+    //} else  { // cache miss
+    //    auto new_analysis = analyze(rev, code, code_size);
+    //    res = execute(*state, new_analysis);
+    //    if(msg->kind != EVMC_CREATE && msg->kind != EVMC_CREATE2) { // add to cache
+    //        CacheShards[sid].add(key, new_analysis, height);
+    //    }
+    //}
+    //return res;
 }
 }  // namespace evmone

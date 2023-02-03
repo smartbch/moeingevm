@@ -169,7 +169,10 @@ func (c *Context) GetDynamicArray(seq uint64, arrSlot string) (res [][]byte) {
 		arrLen.SetBytes32(arrLenBz)
 	}
 	startSlot := uint256.NewInt(0).SetBytes32(crypto.Keccak256([]byte(arrSlot)))
-	endSlot := uint256.NewInt(0).Add(startSlot, arrLen)
+	endSlot, overflow := uint256.NewInt(0).AddOverflow(startSlot, arrLen)
+	if overflow {
+		endSlot = startSlot
+	}
 	for startSlot.Lt(endSlot) {
 		res = append(res, c.GetStorageAt(seq, string(startSlot.Bytes())))
 		startSlot.AddUint64(startSlot, 1)
@@ -194,7 +197,10 @@ func (c *Context) DeleteDynamicArray(seq uint64, arrSlot string) {
 		arrLen.SetBytes32(arrLenBz)
 	}
 	startSlot := uint256.NewInt(0).SetBytes32(crypto.Keccak256([]byte(arrSlot)))
-	endSlot := uint256.NewInt(0).Add(startSlot, arrLen)
+	endSlot, overflow := uint256.NewInt(0).AddOverflow(startSlot, arrLen)
+	if overflow {
+		endSlot = startSlot
+	}
 	for startSlot.Lt(endSlot) {
 		c.DeleteStorageAt(seq, string(startSlot.Bytes()))
 		startSlot.AddUint64(startSlot, 1)
