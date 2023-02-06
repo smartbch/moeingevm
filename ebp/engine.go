@@ -8,7 +8,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/holiman/uint256"
 	"github.com/seehuhn/mt19937"
 	"github.com/tendermint/tendermint/libs/log"
@@ -16,7 +15,6 @@ import (
 	dt "github.com/smartbch/moeingads/datatree"
 	"github.com/smartbch/moeingads/store/rabbit"
 	storetypes "github.com/smartbch/moeingads/store/types"
-	"github.com/smartbch/moeingdb/modb"
 	modbtypes "github.com/smartbch/moeingdb/types"
 
 	"github.com/smartbch/moeingevm/types"
@@ -837,60 +835,4 @@ func GetBlackHoleBalance(ctx *types.Context) *uint256.Int {
 		acc = types.ZeroAccountInfo()
 	}
 	return acc.Balance()
-}
-
-//================================
-
-var (
-	NewRedeemable   = crypto.Keccak256Hash([]byte("NewRedeemable(uint256,uint32,address)"))
-	NewLostAndFound = crypto.Keccak256Hash([]byte("NewLostAndFound(uint256,uint32,address)"))
-	Redeem          = crypto.Keccak256Hash([]byte("Redeem(uint256,uint32,address,uint8)"))
-	ChangeAddr      = crypto.Keccak256Hash([]byte("ChangeAddr(uint256,uint32,address,address)"))
-	Deleted         = crypto.Keccak256Hash([]byte("Deleted(uint256,uint32,address,uint8)"))
-	CcContractAddr  = [20]byte{} //TODO
-)
-
-func (exec *txEngine) CcUtxoOpListsForMoDB() (lists modb.OpListsForCcUtxo) {
-	for _, tx := range exec.committedTxs {
-		for _, log := range tx.Logs {
-			if log.Address != CcContractAddr || len(log.Topics) != 1 {
-				continue
-			}
-			if log.Topics[0] == NewRedeemable {
-				var op modb.NewRedeemableOp
-				copy(op.UtxoId[0:32], log.Data[0:32])
-				copy(op.UtxoId[32:36], log.Data[32+28:64])
-				copy(op.CovenantAddr[:], log.Data[64+12:96])
-				lists.NewRedeemableOps = append(lists.NewRedeemableOps, op)
-			} else if log.Topics[0] == NewLostAndFound {
-				var op modb.NewLostAndFoundOp
-				copy(op.UtxoId[0:32], log.Data[0:32])
-				copy(op.UtxoId[32:36], log.Data[32+28:64])
-				copy(op.CovenantAddr[:], log.Data[64+12:96])
-				lists.NewLostAndFoundOps = append(lists.NewLostAndFoundOps, op)
-			} else if log.Topics[0] == Redeem {
-				var op modb.RedeemOp
-				copy(op.UtxoId[0:32], log.Data[0:32])
-				copy(op.UtxoId[32:36], log.Data[32+28:64])
-				copy(op.CovenantAddr[:], log.Data[64+12:96])
-				op.SourceType = log.Data[127]
-				lists.RedeemOps = append(lists.RedeemOps, op)
-			} else if log.Topics[0] == ChangeAddr {
-				var op modb.ChangeAddrOp
-				copy(op.UtxoId[0:32], log.Data[0:32])
-				copy(op.UtxoId[32:36], log.Data[32+28:64])
-				copy(op.OldCovenantAddr[:], log.Data[64+12:96])
-				copy(op.NewCovenantAddr[:], log.Data[96+12:128])
-				lists.ChangeAddrOps = append(lists.ChangeAddrOps, op)
-			} else if log.Topics[0] == Deleted {
-				var op modb.DeletedOp
-				copy(op.UtxoId[0:32], log.Data[0:32])
-				copy(op.UtxoId[32:36], log.Data[32+28:64])
-				copy(op.CovenantAddr[:], log.Data[64+12:96])
-				op.SourceType = log.Data[127]
-				lists.DeletedOps = append(lists.DeletedOps, op)
-			}
-		}
-	}
-	return
 }

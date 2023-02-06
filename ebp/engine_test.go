@@ -21,8 +21,6 @@ import (
 	"github.com/smartbch/moeingads"
 	"github.com/smartbch/moeingads/store"
 	"github.com/smartbch/moeingads/store/rabbit"
-	"github.com/smartbch/moeingdb/modb"
-
 	"github.com/smartbch/moeingevm/evmwrap/testcase"
 	"github.com/smartbch/moeingevm/types"
 	//"github.com/smartbch/moeingevm/utils"
@@ -468,125 +466,6 @@ nonce:%d
 	}
 }
 
-func TestCcUtxoOpListsForMoDB(t *testing.T) {
-	require.Equal(t, "0x15bab6fd59710de61ff75fa11875274a47fc2179068400add57ba8fb8bb4c5f1", NewRedeemable.Hex())
-	require.Equal(t, "0x5097ba403df8e5415e49ecafe3a1610dce19fdae7df003d29d07d4f0833542ee", NewLostAndFound.Hex())
-	require.Equal(t, "0x8a9c454bba797fa0dfd6fb9d59687e2e0d5e4828de1f91ffdcf4719e1163aec0", Redeem.Hex())
-	require.Equal(t, "0xb2a43f090df954aa921e11f176ae7217b510ff0ea78dbb3d2bec4b06ad92a35a", ChangeAddr.Hex())
-	require.Equal(t, "0x88efadfda2430f2d2ac267ce7158a19f80c4faef7beef319a98ba853e3ebed6f", Deleted.Hex())
-
-	exec := &txEngine{}
-	exec.committedTxs = []*types.Transaction{
-		{
-			Logs: []types.Log{
-				{
-					Address: CcContractAddr,
-					Topics:  [][32]byte{NewRedeemable},
-					Data: hexToBytes("0x" +
-						"44019a3ae9c861c6c805027b5150d768b03186a58269717972cec9dfcabc108e" +
-						"000000000000000000000000000000000000000000000000000000000000007b" +
-						"00000000000000000000000060d8666337c854686f2cf8a49b777c223b72fe34"),
-				},
-				{
-					Address: CcContractAddr,
-					Topics:  [][32]byte{NewRedeemable},
-					Data: hexToBytes("0x" +
-						"5b90e7b5db50a11c3ceeafc59ef9d6317ed3d46f67b1b197037c531bd044d881" +
-						"0000000000000000000000000000000000000000000000000000000000000141" +
-						"0000000000000000000000002fe637ff51a517e6f29f5498b38a3f1d18af5dc7"),
-				},
-				{
-					Address: CcContractAddr,
-					Topics:  [][32]byte{NewLostAndFound},
-					Data: hexToBytes("0x" +
-						"90dc60b63a50d461ef7aa5652566741cf7ba75b0a66e7d56a09461d7cf70df07" +
-						"00000000000000000000000000000000000000000000000000000000000001c8" +
-						"000000000000000000000000c370743331b37d3c6d0ee798b3918f6561af2c92"),
-				},
-			},
-		},
-		{
-			Logs: []types.Log{
-				{
-					Address: CcContractAddr,
-					Topics:  [][32]byte{Redeem},
-					Data: hexToBytes("0x" +
-						"44019a3ae9c861c6c805027b5150d768b03186a58269717972cec9dfcabc108e" +
-						"000000000000000000000000000000000000000000000000000000000000007b" +
-						"00000000000000000000000060d8666337c854686f2cf8a49b777c223b72fe34" +
-						"0000000000000000000000000000000000000000000000000000000000000002"),
-				},
-			},
-		},
-		{
-			Logs: []types.Log{
-				{
-					Address: CcContractAddr,
-					Topics:  [][32]byte{ChangeAddr},
-					Data: hexToBytes("0x" +
-						"90dc60b63a50d461ef7aa5652566741cf7ba75b0a66e7d56a09461d7cf70df07" +
-						"0000000000000000000000000000000000000000000000000000000000000123" +
-						"00000000000000000000000060d8666337c854686f2cf8a49b777c223b72fe34" +
-						"000000000000000000000000c370743331b37d3c6d0ee798b3918f6561af2c92"),
-				},
-			},
-		},
-		{
-			Logs: []types.Log{
-				{
-					Address: CcContractAddr,
-					Topics:  [][32]byte{Deleted},
-					Data: hexToBytes("0x" +
-						"90dc60b63a50d461ef7aa5652566741cf7ba75b0a66e7d56a09461d7cf70df07" +
-						"0000000000000000000000000000000000000000000000000000000000000456" +
-						"0000000000000000000000002FE637Ff51A517E6f29F5498B38a3F1d18Af5DC7" +
-						"0000000000000000000000000000000000000000000000000000000000000009"),
-				},
-			},
-		},
-	}
-	ops := exec.CcUtxoOpListsForMoDB()
-	require.Equal(t, modb.OpListsForCcUtxo{
-		NewRedeemableOps: []modb.NewRedeemableOp{
-			{
-				UtxoId:       hexToUtxoId("0x44019a3ae9c861c6c805027b5150d768b03186a58269717972cec9dfcabc108e0000007b"),
-				CovenantAddr: hexToAddr("0x60d8666337C854686F2CF8A49B777c223b72fe34"),
-			},
-			{
-				UtxoId:       hexToUtxoId("0x5b90e7b5db50a11c3ceeafc59ef9d6317ed3d46f67b1b197037c531bd044d88100000141"),
-				CovenantAddr: hexToAddr("0x2FE637Ff51A517E6f29F5498B38a3F1d18Af5DC7"),
-			},
-		},
-		NewLostAndFoundOps: []modb.NewLostAndFoundOp{
-			{
-				UtxoId:       hexToUtxoId("0x90dc60b63a50d461ef7aa5652566741cf7ba75b0a66e7d56a09461d7cf70df07000001c8"),
-				CovenantAddr: hexToAddr("0xc370743331B37d3C6D0Ee798B3918f6561Af2C92"),
-			},
-		},
-		RedeemOps: []modb.RedeemOp{
-			{
-				UtxoId:       hexToUtxoId("0x44019a3ae9c861c6c805027b5150d768b03186a58269717972cec9dfcabc108e0000007b"),
-				CovenantAddr: hexToAddr("0x60d8666337C854686F2CF8A49B777c223b72fe34"),
-				SourceType:   2,
-			},
-		},
-		ChangeAddrOps: []modb.ChangeAddrOp{
-			{
-				UtxoId:          hexToUtxoId("0x90dc60b63a50d461ef7aa5652566741cf7ba75b0a66e7d56a09461d7cf70df0700000123"),
-				OldCovenantAddr: hexToAddr("0x60d8666337C854686F2CF8A49B777c223b72fe34"),
-				NewCovenantAddr: hexToAddr("0xc370743331B37d3C6D0Ee798B3918f6561Af2C92"),
-			},
-		},
-		DeletedOps: []modb.DeletedOp{
-			{
-				UtxoId:       hexToUtxoId("0x90dc60b63a50d461ef7aa5652566741cf7ba75b0a66e7d56a09461d7cf70df0700000456"),
-				CovenantAddr: hexToAddr("0x2FE637Ff51A517E6f29F5498B38a3F1d18Af5DC7"),
-				SourceType:   9,
-			},
-		},
-	}, ops)
-}
-
 func closeTestCtx(rootStore *store.RootStore) {
 	rootStore.Close()
 	_ = os.RemoveAll("./testdbdata")
@@ -602,13 +481,4 @@ func hexToBytes(s string) []byte {
 		panic(err)
 	}
 	return bytes
-}
-
-func hexToUtxoId(s string) (utxoId [36]byte) {
-	copy(utxoId[:], hexToBytes(s))
-	return
-}
-func hexToAddr(s string) (addr [20]byte) {
-	copy(addr[:], hexToBytes(s))
-	return
 }
