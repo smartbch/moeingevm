@@ -20,6 +20,7 @@ var (
 	ErrTooManyEntries         = errors.New("too many candidicate entries to be returned, please limit the difference between startHeight and endHeight")
 )
 
+// update WithRbtCopy when fields change in Context
 type Context struct {
 	Rbt              *rabbit.RabbitStore
 	Db               modbtypes.DB
@@ -27,6 +28,7 @@ type Context struct {
 	XHedgeForkBlock  int64
 	StakingForkBlock int64
 	ShaGateForkBlock int64
+	Type             uint8
 }
 
 func NewContext(rbt *rabbit.RabbitStore, db modbtypes.DB) *Context {
@@ -59,6 +61,17 @@ func (c *Context) WithDb(db modbtypes.DB) *Context {
 		ShaGateForkBlock: c.ShaGateForkBlock,
 		Height:           c.Height,
 	}
+}
+
+const (
+	CheckTxType     = 1
+	RpcType         = 2
+	RunTxType       = 3
+	HistoryOnlyType = 4
+)
+
+func (c *Context) SetType(t uint8) {
+	c.Type = t
 }
 
 func (c *Context) SetXHedgeForkBlock(xHedgeForkBlock int64) {
@@ -103,6 +116,7 @@ func (c *Context) WithRbtCopy() *Context {
 		StakingForkBlock: c.StakingForkBlock,
 		XHedgeForkBlock:  c.XHedgeForkBlock,
 		Height:           c.Height,
+		Type:             c.Type,
 	}
 }
 
