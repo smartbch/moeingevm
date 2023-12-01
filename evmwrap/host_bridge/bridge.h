@@ -108,6 +108,7 @@ struct all_changed {
 
 struct config {
 	bool after_xhedge_fork;
+	bool after_symbolsbch_fork;
 };
 
 // Go environment passes information about a block through this struct to C environment

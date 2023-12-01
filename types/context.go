@@ -22,44 +22,47 @@ var (
 
 // update WithRbtCopy when fields change in Context
 type Context struct {
-	Rbt              *rabbit.RabbitStore
-	Db               modbtypes.DB
-	Height           int64
-	XHedgeForkBlock  int64
-	StakingForkBlock int64
-	ShaGateForkBlock int64
-	Type             uint8
+	Rbt                 *rabbit.RabbitStore
+	Db                  modbtypes.DB
+	Height              int64
+	XHedgeForkBlock     int64
+	SymbolSbchForkBlock int64
+	StakingForkBlock    int64
+	ShaGateForkBlock    int64
+	Type                uint8
 }
 
 func NewContext(rbt *rabbit.RabbitStore, db modbtypes.DB) *Context {
 	return &Context{
-		Rbt:              rbt,
-		Db:               db,
-		XHedgeForkBlock:  math.MaxInt64,
-		StakingForkBlock: math.MaxInt64,
-		ShaGateForkBlock: math.MaxInt64,
+		Rbt:                 rbt,
+		Db:                  db,
+		XHedgeForkBlock:     math.MaxInt64,
+		SymbolSbchForkBlock: math.MaxInt64,
+		StakingForkBlock:    math.MaxInt64,
+		ShaGateForkBlock:    math.MaxInt64,
 	}
 }
 
 func (c *Context) WithRbt(rabbitStore *rabbit.RabbitStore) *Context {
 	return &Context{
-		Rbt:              rabbitStore,
-		Db:               c.Db,
-		XHedgeForkBlock:  c.XHedgeForkBlock,
-		StakingForkBlock: c.StakingForkBlock,
-		ShaGateForkBlock: c.ShaGateForkBlock,
-		Height:           c.Height,
+		Rbt:                 rabbitStore,
+		Db:                  c.Db,
+		XHedgeForkBlock:     c.XHedgeForkBlock,
+		SymbolSbchForkBlock: c.SymbolSbchForkBlock,
+		StakingForkBlock:    c.StakingForkBlock,
+		ShaGateForkBlock:    c.ShaGateForkBlock,
+		Height:              c.Height,
 	}
 }
 
 func (c *Context) WithDb(db modbtypes.DB) *Context {
 	return &Context{
-		Rbt:              c.Rbt,
-		Db:               db,
-		XHedgeForkBlock:  c.XHedgeForkBlock,
-		StakingForkBlock: c.StakingForkBlock,
-		ShaGateForkBlock: c.ShaGateForkBlock,
-		Height:           c.Height,
+		Rbt:                 c.Rbt,
+		Db:                  db,
+		SymbolSbchForkBlock: c.XHedgeForkBlock,
+		StakingForkBlock:    c.StakingForkBlock,
+		ShaGateForkBlock:    c.ShaGateForkBlock,
+		Height:              c.Height,
 	}
 }
 
@@ -78,6 +81,10 @@ func (c *Context) SetXHedgeForkBlock(xHedgeForkBlock int64) {
 	c.XHedgeForkBlock = xHedgeForkBlock
 }
 
+func (c *Context) SetSymbolSbchBlock(symbolSbchForkBlock int64) {
+	c.SymbolSbchForkBlock = symbolSbchForkBlock
+}
+
 func (c *Context) SetStakingForkBlock(stakingForkBlock int64) {
 	c.StakingForkBlock = stakingForkBlock
 }
@@ -92,6 +99,10 @@ func (c *Context) SetCurrentHeight(height int64) {
 
 func (c *Context) IsXHedgeFork() bool {
 	return c.Height >= c.XHedgeForkBlock
+}
+
+func (c *Context) IsSymbolSbchFork() bool {
+	return c.Height >= c.SymbolSbchFork
 }
 
 func (c *Context) IsStakingFork() bool {
@@ -110,13 +121,14 @@ func (c *Context) WithRbtCopy() *Context {
 	parent := c.Rbt.GetBaseStore()
 	r := rabbit.NewRabbitStore(parent)
 	return &Context{
-		Rbt:              &r,
-		Db:               c.Db,
-		ShaGateForkBlock: c.ShaGateForkBlock,
-		StakingForkBlock: c.StakingForkBlock,
-		XHedgeForkBlock:  c.XHedgeForkBlock,
-		Height:           c.Height,
-		Type:             c.Type,
+		Rbt:                 &r,
+		Db:                  c.Db,
+		ShaGateForkBlock:    c.ShaGateForkBlock,
+		StakingForkBlock:    c.StakingForkBlock,
+		XHedgeForkBlock:     c.XHedgeForkBlock,
+		SymbolSbchForkBlock: c.SymbolSbchForkBlock,
+		Height:              c.Height,
+		Type:                c.Type,
 	}
 }
 
