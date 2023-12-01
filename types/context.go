@@ -59,7 +59,8 @@ func (c *Context) WithDb(db modbtypes.DB) *Context {
 	return &Context{
 		Rbt:                 c.Rbt,
 		Db:                  db,
-		SymbolSbchForkBlock: c.XHedgeForkBlock,
+		XHedgeForkBlock:     c.XHedgeForkBlock,
+		SymbolSbchForkBlock: c.SymbolSbchForkBlock,
 		StakingForkBlock:    c.StakingForkBlock,
 		ShaGateForkBlock:    c.ShaGateForkBlock,
 		Height:              c.Height,
@@ -102,7 +103,7 @@ func (c *Context) IsXHedgeFork() bool {
 }
 
 func (c *Context) IsSymbolSbchFork() bool {
-	return c.Height >= c.SymbolSbchFork
+	return c.Height >= c.SymbolSbchForkBlock
 }
 
 func (c *Context) IsStakingFork() bool {
