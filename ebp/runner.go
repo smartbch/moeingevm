@@ -595,6 +595,7 @@ func runTxHelper(idx int, currBlock *types.BlockInfo, estimateGas bool) int64 {
 	bi.timestamp = C.int64_t(currBlock.Timestamp)
 	bi.gas_limit = C.int64_t(currBlock.GasLimit)
 	bi.cfg.after_xhedge_fork = C.bool(runner.Ctx.IsXHedgeFork())
+	bi.cfg.after_symbolsbch_fork = C.bool(runner.Ctx.IsSymbolSbchFork())
 	writeCBytes32WithSlice(&bi.difficulty, currBlock.Difficulty[:])
 	writeCBytes32WithSlice(&bi.chain_id, currBlock.ChainId[:])
 	data_ptr := (*C.uint8_t)(nil)

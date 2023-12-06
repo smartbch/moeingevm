@@ -1109,14 +1109,29 @@ evmc_result evmc_host_context::run_precompiled_contract_sep206() {
 	}
 	switch(selector) {
 		case SELECTOR_SEP206_NAME:
-			return evmc_result_from_str(this->smallbuf->data, "BCH", msg.gas);
+			if(txctrl->get_cfg().after_symbolsbch_fork) {
+				return evmc_result_from_str(this->smallbuf->data, "SmartBCH", msg.gas);
+			} else {
+				return evmc_result_from_str(this->smallbuf->data, "BCH", msg.gas);
+			}
 		case SELECTOR_SEP206_SYMBOL:
-			return evmc_result_from_str(this->smallbuf->data, "BCH", msg.gas);
+			if(txctrl->get_cfg().after_symbolsbch_fork) {
+				return evmc_result_from_str(this->smallbuf->data, "SBCH", msg.gas);
+			} else {
+				return evmc_result_from_str(this->smallbuf->data, "BCH", msg.gas);
+			}
 		case SELECTOR_SEP206_DECIMALS:
 			return evmc_result_from_uint256(this->smallbuf->data, uint256(18), msg.gas);
 		case SELECTOR_SEP206_TOTALSUPPLY:
-			return evmc_result_from_uint256(this->smallbuf->data, 
+			if(txctrl->get_cfg().after_symbolsbch_fork) {
+			//68313*(10**18)+420483504311319128==(2100*10**22-0x11507500cf69c274d8c5a8)
+				return evmc_result_from_uint256(this->smallbuf->data, 
+					uint256(68313)*uint256(1000000000000000000) +
+					uint256(420483504311319128), msg.gas);
+			} else {
+				return evmc_result_from_uint256(this->smallbuf->data, 
 					uint256(2100*10000)*uint256(1000000000000000000), msg.gas);
+			}
 		case SELECTOR_SEP206_BALANCEOF:
 			return sep206_balanceOf();
 		case SELECTOR_SEP206_ALLOWANCE:
