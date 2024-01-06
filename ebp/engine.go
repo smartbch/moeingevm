@@ -37,6 +37,43 @@ type TxRange struct {
 	end   uint64
 }
 
+type rwList struct {
+	rList []uint64
+	wList []uint64
+}
+
+func newRWList() rwList {
+	return rwList{
+		rList: make([]uint64, 0, 32), 
+		wList: make([]uint64, 0, 32),
+	}
+}
+
+func (rwl *rwList) add(k uint64, isWrite bool) {
+	if isWrite {
+		rwl.rList = append(rwl.rList, k)
+	} else {
+		rwl.wList = append(rwl.wList, k)
+	}
+}
+
+func (rwl rwList) conflictsWith(touchedSet map[uint64]struct{}) bool {
+	for _, l := range [2][]uint64{rwl.rList, rwl.wList} {
+		for _, k := range l {
+			if _, ok := touchedSet[k]; ok {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (rwl rwList) updateTouchedSet(touchedSet map[uint64]struct{}) {
+	for _, k := range rwl.wList {
+		touchedSet[k] = struct{}{}
+	}
+}
+
 type txEngine struct {
 	// How many parallel execution round are performed for each block
 	roundNum int //consensus parameter
@@ -53,6 +90,9 @@ type txEngine struct {
 	// Used to check signatures
 	signer       gethtypes.Signer
 	currentBlock *types.BlockInfo
+
+	rwListMap        map[common.Hash]rwList
+	checkRWInLoading bool
 
 	cumulativeGasUsed   uint64
 	cumulativeFeeRefund *uint256.Int
@@ -174,6 +214,10 @@ func NewEbpTxExec(exeRoundCount, runnerNumber, parallelNum, defaultTxListCap int
 		signer:       s,
 		logger:       logger,
 	}
+}
+
+func (exec *txEngine) SetCheckRWInLoading(b bool) {
+	exec.checkRWInLoading = b
 }
 
 func (exec *txEngine) SetAotParam(aotDir string, aotReloadInterval int64) {
@@ -450,6 +494,7 @@ func (exec *txEngine) Execute(currBlock *types.BlockInfo) {
 	exec.cumulativeFeeRefund = uint256.NewInt(0)
 	exec.cumulativeGasFee = uint256.NewInt(0)
 	exec.currentBlock = currBlock
+	exec.rwListMap = make(map[common.Hash]rwList, 1024)
 	startKey, endKey := exec.getStandbyQueueRange()
 	if startKey == endKey {
 		return
@@ -467,6 +512,9 @@ func (exec *txEngine) Execute(currBlock *types.BlockInfo) {
 			break
 		}
 		numTx := exec.executeOneRound(txRange, exec.currentBlock)
+		if numTx == 0 && exec.checkRWInLoading {
+			break
+		}
 		for i := 0; i < numTx; i++ {
 			if Runners[i] == nil {
 				continue // the TX is not committable and needs re-execution
@@ -504,24 +552,34 @@ func (exec *txEngine) setStandbyQueueRange(start, end uint64) {
 
 // Execute 'runnerNumber' transactions in parallel and commit the ones without any interdependency
 func (exec *txEngine) executeOneRound(txRange *TxRange, currBlock *types.BlockInfo) int {
-	txBundle := exec.loadStandbyTxs(txRange)
+	txBundle, ignoreList := exec.loadStandbyTxs(txRange)
+	if exec.checkRWInLoading && len(txBundle) == 0 {
+		return 0
+	}
 	kvCount := exec.runTxInParallel(txRange, txBundle, currBlock)
-	exec.checkTxDepsAndUptStandbyQ(txRange, txBundle, int(kvCount))
+	exec.checkTxDepsAndUptStandbyQ(txRange, txBundle, ignoreList, int(kvCount))
 	return len(txBundle)
 }
 
 // Load at most 'exec.runnerNumber' transactions from standby queue
-func (exec *txEngine) loadStandbyTxs(txRange *TxRange) (txBundle []types.TxToRun) {
+func (exec *txEngine) loadStandbyTxs(txRange *TxRange) (txBundle, ignoreList []types.TxToRun) {
+	touchedSet := make(map[uint64]struct{}, 4096)
 	ctx := exec.cleanCtx.WithRbtCopy()
-	end := txRange.end
-	if end > txRange.start+uint64(exec.runnerNumber) { // load at most exec.runnerNumber
-		end = txRange.start + uint64(exec.runnerNumber)
-	}
-	txBundle = make([]types.TxToRun, end-txRange.start)
-	for i := txRange.start; i < end; i++ {
+	txBundle = make([]types.TxToRun, 0, exec.runnerNumber)
+	ignoreList = make([]types.TxToRun, 0, exec.runnerNumber)
+	for i := txRange.start; i < txRange.end && len(txBundle) < exec.runnerNumber; i++ {
 		k := types.GetStandbyTxKey(i)
 		bz := ctx.Rbt.GetBaseStore().Get(k)
-		txBundle[i-txRange.start].FromBytes(bz)
+		var txToRun types.TxToRun
+		txToRun.FromBytes(bz)
+		rwList, isRecorded := exec.rwListMap[txToRun.HashID]
+		hasConflicts := exec.checkRWInLoading && isRecorded && rwList.conflictsWith(touchedSet)
+		if hasConflicts {
+			ignoreList = append(ignoreList, txToRun)
+		} else {
+			rwList.updateTouchedSet(touchedSet)
+			txBundle = append(txBundle, txToRun)
+		}
 	}
 	ctx.Close(false)
 	return
@@ -562,7 +620,7 @@ type indexAndBool struct {
 
 // Check interdependency of TXs using 'touchedSet'. The ones with dependency with former committed TXs cannot
 // be committed and should be inserted back into the standby queue.
-func (exec *txEngine) checkTxDepsAndUptStandbyQ(txRange *TxRange, txBundle []types.TxToRun, kvCount int) {
+func (exec *txEngine) checkTxDepsAndUptStandbyQ(txRange *TxRange, txBundle, ignoreList []types.TxToRun, kvCount int) {
 	touchedSet := make(map[uint64]struct{}, kvCount)
 	var wg sync.WaitGroup
 	idxChan := make(chan indexAndBool, 10)
@@ -579,8 +637,10 @@ func (exec *txEngine) checkTxDepsAndUptStandbyQ(txRange *TxRange, txBundle []typ
 	}()
 	for idx := range txBundle {
 		canCommit := true
+		rwList := newRWList()
 		Runners[idx].Ctx.Rbt.ScanAllShortKeys(func(key [rabbit.KeySize]byte, dirty bool) (stop bool) {
 			k := binary.LittleEndian.Uint64(key[:])
+			rwList.add(k, dirty)
 			if _, ok := touchedSet[k]; ok {
 				canCommit = false // cannot commit if conflicts with touched KV set
 				Runners[idx].Status = types.FAILED_TO_COMMIT
@@ -590,13 +650,10 @@ func (exec *txEngine) checkTxDepsAndUptStandbyQ(txRange *TxRange, txBundle []typ
 			}
 		})
 		if canCommit { // record the dirty KVs written by a committable TX into toucchedSet
-			Runners[idx].Ctx.Rbt.ScanAllShortKeys(func(key [rabbit.KeySize]byte, dirty bool) (stop bool) {
-				if dirty {
-					k := binary.LittleEndian.Uint64(key[:])
-					touchedSet[k] = struct{}{}
-				}
-				return false
-			})
+			rwList.updateTouchedSet(touchedSet)
+		}
+		if exec.checkRWInLoading {
+			exec.rwListMap[Runners[idx].Tx.HashID] = rwList
 		}
 		idxChan <- indexAndBool{idx, canCommit}
 	}
@@ -621,6 +678,11 @@ func (exec *txEngine) checkTxDepsAndUptStandbyQ(txRange *TxRange, txBundle []typ
 				exec.cumulativeGasFee.Add(exec.cumulativeGasFee, Runners[idx].GetGasFee())
 				Runners[idx] = nil
 			}
+		}
+		for _, tx := range ignoreList {
+			newK := types.GetStandbyTxKey(txRange.end)
+			txRange.end++
+			store.Set(newK, tx.ToBytes())
 		}
 	})
 }
