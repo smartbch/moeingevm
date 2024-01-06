@@ -51,9 +51,9 @@ func newRWList() rwList {
 
 func (rwl *rwList) add(k uint64, isWrite bool) {
 	if isWrite {
-		rwl.rList = append(rwl.rList, k)
-	} else {
 		rwl.wList = append(rwl.wList, k)
+	} else {
+		rwl.rList = append(rwl.rList, k)
 	}
 }
 
