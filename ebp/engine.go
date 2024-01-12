@@ -49,6 +49,11 @@ func newRWList() rwList {
 	}
 }
 
+func (rwl *rwList) reset() {
+	rwl.wList = rwl.wList[:0]
+	rwl.rList = rwl.rList[:0]
+}
+
 func (rwl *rwList) add(k uint64, isWrite bool) {
 	if isWrite {
 		rwl.wList = append(rwl.wList, k)
@@ -566,8 +571,8 @@ func (exec *txEngine) loadStandbyTxs(txRange *TxRange) (txBundle, ignoreList []t
 	touchedSet := make(map[uint64]struct{}, 4096)
 	ctx := exec.cleanCtx.WithRbtCopy()
 	txBundle = make([]types.TxToRun, 0, exec.runnerNumber)
-	ignoreList = make([]types.TxToRun, 0, exec.runnerNumber)
-	for i := txRange.start; i < txRange.end && len(txBundle) < exec.runnerNumber; i++ {
+	ignoreList = make([]types.TxToRun, 0, 2*exec.runnerNumber)
+	for i := txRange.start; i < txRange.end && len(txBundle) < exec.runnerNumber && len(ignoreList) < 2*exec.runnerNumber; i++ {
 		k := types.GetStandbyTxKey(i)
 		bz := ctx.Rbt.GetBaseStore().Get(k)
 		var txToRun types.TxToRun
@@ -635,9 +640,9 @@ func (exec *txEngine) checkTxDepsAndUptStandbyQ(txRange *TxRange, txBundle, igno
 		}
 		wg.Done()
 	}()
+	rwList := newRWList()
 	for idx := range txBundle {
 		canCommit := true
-		rwList := newRWList()
 		Runners[idx].Ctx.Rbt.ScanAllShortKeys(func(key [rabbit.KeySize]byte, dirty bool) (stop bool) {
 			k := binary.LittleEndian.Uint64(key[:])
 			rwList.add(k, dirty)
@@ -654,6 +659,9 @@ func (exec *txEngine) checkTxDepsAndUptStandbyQ(txRange *TxRange, txBundle, igno
 		}
 		if exec.checkRWInLoading {
 			exec.rwListMap[Runners[idx].Tx.HashID] = rwList
+			rwList = newRWList()
+		} else {
+			rwList.reset()
 		}
 		idxChan <- indexAndBool{idx, canCommit}
 	}
