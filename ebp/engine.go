@@ -680,8 +680,13 @@ func (exec *txEngine) checkTxDepsAndUptStandbyQ(txRange *TxRange, txBundle, igno
 			}
 		}
 		for _, tx := range ignoreList {
+			k := types.GetStandbyTxKey(txRange.start)
+			trunk.PrepareForDeletion(k)
+			store.Delete(k)
+			txRange.start++
 			newK := types.GetStandbyTxKey(txRange.end)
 			txRange.end++
+			trunk.PrepareForUpdate(newK)
 			store.Set(newK, tx.ToBytes())
 		}
 	})
