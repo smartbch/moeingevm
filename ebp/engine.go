@@ -561,7 +561,7 @@ func (exec *txEngine) executeOneRound(txRange *TxRange, currBlock *types.BlockIn
 	if exec.checkRWInLoading && len(txBundle) == 0 {
 		return 0
 	}
-	kvCount := exec.runTxInParallel(txRange, txBundle, currBlock)
+	kvCount := exec.runTxInParallel(txRange, txBundle, len(ignoreList), currBlock)
 	exec.checkTxDepsAndUptStandbyQ(txRange, txBundle, ignoreList, int(kvCount))
 	return len(txBundle)
 }
@@ -592,19 +592,23 @@ func (exec *txEngine) loadStandbyTxs(txRange *TxRange) (txBundle, ignoreList []t
 
 // Assign the transactions to global 'Runners' and run them in parallel.
 // Record the count of touched KV pairs and return it as a hint for checkTxDepsAndUptStandbyQ
-func (exec *txEngine) runTxInParallel(txRange *TxRange, txBundle []types.TxToRun, currBlock *types.BlockInfo) (kvCount int64) {
+func (exec *txEngine) runTxInParallel(txRange *TxRange, txBundle []types.TxToRun, ignoreLen int, currBlock *types.BlockInfo) (kvCount int64) {
 	sharedIdx := int64(-1)
+	trunk := exec.cleanCtx.Rbt.GetBaseStore()
 	dt.ParallelRun(exec.parallelNum, func(_ int) {
 		for {
 			myIdx := atomic.AddInt64(&sharedIdx, 1)
-			if myIdx >= int64(len(txBundle)) {
+			if myIdx >= int64(len(txBundle) + ignoreLen) {
 				return
 			}
-			Runners[myIdx] = NewTxRunner(exec.cleanCtx.WithRbtCopy(), &txBundle[myIdx])
 			k := types.GetStandbyTxKey(txRange.start + uint64(myIdx))
-			Runners[myIdx].Ctx.Rbt.GetBaseStore().PrepareForDeletion(k) // remove it from the standby queue
+			trunk.PrepareForDeletion(k) // remove it from the standby queue
 			k = types.GetStandbyTxKey(txRange.end + uint64(myIdx))
-			Runners[myIdx].Ctx.Rbt.GetBaseStore().PrepareForUpdate(k) //warm up
+			trunk.PrepareForUpdate(k) //warm up
+			if myIdx >= int64(len(txBundle)) {
+				continue
+			}
+			Runners[myIdx] = NewTxRunner(exec.cleanCtx.WithRbtCopy(), &txBundle[myIdx])
 			if myIdx > 0 && txBundle[myIdx-1].From == txBundle[myIdx].From {
 				// In reorderInfoList, we placed the tx with same 'From' back-to-back
 				// same from-address as previous transaction, cannot run in same round
@@ -689,12 +693,10 @@ func (exec *txEngine) checkTxDepsAndUptStandbyQ(txRange *TxRange, txBundle, igno
 		}
 		for _, tx := range ignoreList {
 			k := types.GetStandbyTxKey(txRange.start)
-			trunk.PrepareForDeletion(k)
 			store.Delete(k)
 			txRange.start++
 			newK := types.GetStandbyTxKey(txRange.end)
 			txRange.end++
-			trunk.PrepareForUpdate(newK)
 			store.Set(newK, tx.ToBytes())
 		}
 	})
