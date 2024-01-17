@@ -44,7 +44,7 @@ type rwList struct {
 
 func newRWList() rwList {
 	return rwList{
-		rList: make([]uint64, 0, 32), 
+		rList: make([]uint64, 0, 32),
 		wList: make([]uint64, 0, 32),
 	}
 }
@@ -107,6 +107,9 @@ type txEngine struct {
 	aotReloadInterval int64
 
 	logger log.Logger
+
+	// for ut
+	txExecutedCount int
 }
 
 func (exec *txEngine) Context() *types.Context {
@@ -508,6 +511,7 @@ func (exec *txEngine) Execute(currBlock *types.BlockInfo) {
 		start: startKey,
 		end:   endKey,
 	}
+	exec.txExecutedCount = 0
 	committableRunnerList := make([]*TxRunner, 0, 4096)
 	// Repeat exec.roundNum round for execute txs in standby q. At the end of each round
 	// modifications made by TXs are written to world state. So TXs in later rounds can
@@ -517,6 +521,7 @@ func (exec *txEngine) Execute(currBlock *types.BlockInfo) {
 			break
 		}
 		numTx := exec.executeOneRound(txRange, exec.currentBlock)
+		exec.txExecutedCount += numTx
 		if numTx == 0 && exec.checkRWInLoading {
 			break
 		}
@@ -598,7 +603,7 @@ func (exec *txEngine) runTxInParallel(txRange *TxRange, txBundle []types.TxToRun
 	dt.ParallelRun(exec.parallelNum, func(_ int) {
 		for {
 			myIdx := atomic.AddInt64(&sharedIdx, 1)
-			if myIdx >= int64(len(txBundle) + ignoreLen) {
+			if myIdx >= int64(len(txBundle)+ignoreLen) {
 				return
 			}
 			k := types.GetStandbyTxKey(txRange.start + uint64(myIdx))

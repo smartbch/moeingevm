@@ -3,7 +3,6 @@ package ebp
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"math/big"
 	"math/rand"
 	"os"
@@ -49,6 +48,7 @@ func prepareCtx(t *store.TrunkStore) *types.Context {
 var (
 	_, from1 = GenKeyAndAddr()
 	from2    = common.HexToAddress("0x2")
+	from3    = common.HexToAddress("0x03")
 	to1      = common.HexToAddress("0x10")
 	to2      = common.HexToAddress("0x20")
 )
@@ -67,9 +67,12 @@ func prepareAccAndTx(e *txEngine) []*gethtypes.Transaction {
 	acc2 := types.ZeroAccountInfo()
 	balance2, _ := uint256.FromBig(big.NewInt(10000_0000_0000))
 	acc2.UpdateBalance(balance2)
-
+	acc3 := types.ZeroAccountInfo()
+	balance3, _ := uint256.FromBig(big.NewInt(10000_0000_0000))
+	acc3.UpdateBalance(balance3)
 	e.cleanCtx.SetAccount(from1, acc1)
 	e.cleanCtx.SetAccount(from2, acc2)
+	e.cleanCtx.SetAccount(from3, acc3)
 
 	tx1, _ := gethtypes.NewTransaction(0, to1, big.NewInt(100), 100000, big.NewInt(1), nil).WithSignature(e.signer, from1.Bytes())
 	tx2, _ := gethtypes.NewTransaction(0, to2, big.NewInt(100), 100000, big.NewInt(1), nil).WithSignature(e.signer, from2.Bytes())
@@ -97,7 +100,7 @@ func TestTxEngine_DifferentAccount(t *testing.T) {
 	e.Prepare(0, 0, DefaultTxGasLimit)
 	e.SetContext(prepareCtx(trunk))
 	startKey, endKey := e.getStandbyQueueRange()
-	txsStandby := e.loadStandbyTxs(&TxRange{
+	txsStandby, _ := e.loadStandbyTxs(&TxRange{
 		start: startKey,
 		end:   endKey,
 	})
@@ -119,6 +122,48 @@ func TestTxEngine_DifferentAccount(t *testing.T) {
 	e.SetContext(prepareCtx(trunk))
 	startKey, endKey = e.getStandbyQueueRange()
 	require.Equal(t, true, startKey == endKey && endKey == 2)
+}
+
+func TestTxEngine_CheckRWInLoading(t *testing.T) {
+	AdjustGasUsed = false
+	trunk, root := prepareTruck()
+	defer closeTestCtx(root)
+	e := NewEbpTxExec(5, 100, 2, 10, &testcase.DumbSigner{}, log.NewNopLogger())
+	e.SetContext(prepareCtx(trunk))
+	txs := prepareAccAndTx(e)
+	tx2, _ := gethtypes.NewTransaction(0, to1, big.NewInt(100), 100000, big.NewInt(1), nil).WithSignature(e.signer, from2.Bytes())
+	txs[1] = tx2
+	tx3, _ := gethtypes.NewTransaction(0, to1, big.NewInt(100), 100000, big.NewInt(1), nil).WithSignature(e.signer, from3.Bytes())
+	txs = append(txs, tx3)
+	e.SetContext(prepareCtx(trunk))
+	for _, tx := range txs {
+		e.CollectTx(tx)
+	}
+	e.checkRWInLoading = true
+	e.Prepare(0, 0, DefaultTxGasLimit)
+	e.SetContext(prepareCtx(trunk))
+	startKey, endKey := e.getStandbyQueueRange()
+	txsStandby, _ := e.loadStandbyTxs(&TxRange{
+		start: startKey,
+		end:   endKey,
+	})
+	require.Equal(t, 3, len(txsStandby))
+	require.Equal(t, true, bytes.Equal(txs[0].To().Bytes(), txsStandby[0].To.Bytes()))
+	require.Equal(t, true, bytes.Equal(txs[1].To().Bytes(), txsStandby[1].To.Bytes()))
+	e.Execute(&types.BlockInfo{})
+	require.Equal(t, 3, len(e.committedTxs))
+	require.Equal(t, 3+1+1, e.txExecutedCount)
+	e.SetContext(prepareCtx(trunk))
+	to1 := e.cleanCtx.GetAccount(*txs[0].To())
+	require.Equal(t, uint64(300), to1.Balance().Uint64())
+	from1Acc := e.cleanCtx.GetAccount(from1)
+	from2Acc := e.cleanCtx.GetAccount(from2)
+	require.Equal(t, uint64(10000_0000_0000-21000-100), from1Acc.Balance().Uint64())
+	require.Equal(t, uint64(10000_0000_0000-21000-100), from2Acc.Balance().Uint64())
+	e.cleanCtx.Close(false)
+	e.SetContext(prepareCtx(trunk))
+	startKey, endKey = e.getStandbyQueueRange()
+	require.Equal(t, true, startKey == endKey && endKey == 6)
 }
 
 /*
@@ -151,7 +196,7 @@ func TestTxEngine_SameAccount(t *testing.T) {
 	e.Prepare(0, 0, DefaultTxGasLimit)
 	e.SetContext(prepareCtx(trunk))
 	startKey, endKey := e.getStandbyQueueRange()
-	txsStandby := e.loadStandbyTxs(&TxRange{
+	txsStandby, _ := e.loadStandbyTxs(&TxRange{
 		start: startKey,
 		end:   endKey,
 	})
@@ -212,12 +257,12 @@ func TestRandomTxExecuteConsistent(t *testing.T) {
 			require.Equal(t, true, bytes.Equal(tx1.To.Bytes(), r2.standbyTxs[i].To.Bytes()))
 			require.Equal(t, tx1.Nonce, r2.standbyTxs[i].Nonce)
 			require.Equal(t, true, bytes.Equal(tx1.Value[:], r2.standbyTxs[i].Value[:]))
-			fmt.Printf(
-				`
-from:%s
-to:%s
-nonce:%d
-`, tx1.From.String(), tx1.To.String(), tx1.Nonce)
+			//			fmt.Printf(
+			//				`
+			//from:%s
+			//to:%s
+			//nonce:%d
+			//`, tx1.From.String(), tx1.To.String(), tx1.Nonce)
 		}
 		//check balance
 		require.Equal(t, r1.from1.Balance(), r2.from1.Balance())
@@ -264,7 +309,7 @@ func executeTxs(randomTxs []*gethtypes.Transaction, trunk *store.TrunkStore) exe
 	}
 	e.Prepare(0, 0, DefaultTxGasLimit)
 	startKey, endKey := e.getStandbyQueueRange()
-	standbyTxs := e.loadStandbyTxs(&TxRange{
+	standbyTxs, _ := e.loadStandbyTxs(&TxRange{
 		start: startKey,
 		end:   endKey,
 	})
@@ -441,29 +486,30 @@ func TestConsistentForDebug(t *testing.T) {
 	txs[7] = tx
 	tx, _ = gethtypes.NewTransaction(3, to2, big.NewInt(109), 100000, big.NewInt(1), nil).WithSignature(signer, from2.Bytes())
 	txs[8] = tx
-	r := executeTxs(txs, trunk)
+	executeTxs(txs, trunk)
+	//r := executeTxs(txs, trunk)
 	//fmt.Println(r.from1.Balance().Uint64())
 	//fmt.Println(r.from2.Balance().Uint64())
 	//fmt.Println(r.to1.Balance().Uint64())
 	//fmt.Println(r.to2.Balance().Uint64())
-	for _, tx := range r.standbyTxs {
-		fmt.Printf(
-			`
-starndy tx:
-from:%s
-to:%s
-nonce:%d
-`, tx.From.String(), tx.To.String(), tx.Nonce)
-	}
-	for _, tx := range r.committedTxs {
-		fmt.Printf(
-			`
-commited tx:
-from:%v
-to:%v
-nonce:%d
-`, tx.From, tx.To, tx.Nonce)
-	}
+	//	for _, tx := range r.standbyTxs {
+	//		fmt.Printf(
+	//			`
+	//starndy tx:
+	//from:%s
+	//to:%s
+	//nonce:%d
+	//`, tx.From.String(), tx.To.String(), tx.Nonce)
+	//	}
+	//	for _, tx := range r.committedTxs {
+	//		fmt.Printf(
+	//			`
+	//commited tx:
+	//from:%v
+	//to:%v
+	//nonce:%d
+	//`, tx.From, tx.To, tx.Nonce)
+	//	}
 }
 
 func closeTestCtx(rootStore *store.RootStore) {
