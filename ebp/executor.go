@@ -11,6 +11,7 @@ import (
 
 type TxExecutor interface {
 	SetAotParam(aotDir string, aotReloadInterval int64)
+	SetCheckRWInLoading(b bool)
 
 	//step 1: for deliverTx, collect block txs in engine.txList
 	CollectTx(tx *gethtypes.Transaction)
