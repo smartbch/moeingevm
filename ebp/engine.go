@@ -655,9 +655,11 @@ func (exec *txEngine) checkTxDepsAndUptStandbyQ(txRange *TxRange, txBundle, igno
 		Runners[idx].Ctx.Rbt.ScanAllShortKeys(func(key [rabbit.KeySize]byte, dirty bool) (stop bool) {
 			k := binary.LittleEndian.Uint64(key[:])
 			rwList.add(k, dirty)
-			if _, ok := touchedSet[k]; ok && canCommit {
-				canCommit = false // cannot commit if conflicts with touched KV set
-				Runners[idx].Status = types.FAILED_TO_COMMIT
+			if canCommit {
+				if _, ok := touchedSet[k]; ok {
+					canCommit = false // cannot commit if conflicts with touched KV set
+					Runners[idx].Status = types.FAILED_TO_COMMIT
+				}
 			}
 			return false
 		})
